@@ -1,0 +1,18 @@
+{% load static %}
+<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Checkout | BERA</title><link rel="stylesheet" href="{% static 'css/home.css' %}?v={{ storefront_version }}"><link rel="stylesheet" href="{% static 'css/bera-home.css' %}?v={{ storefront_version }}"><script src="{% static 'home.js' %}?v={{ storefront_version }}" defer></script></head>
+<body class="bera-home home-mobile-reference bera-storefront-header">
+{% include 'shop/partials/header.html' %}
+<main class="cart-page checkout-page">
+<nav class="product-breadcrumb" aria-label="Putanja"><a href="{% url 'home' %}">Početna</a><span>/</span><a href="{% url 'cart' %}">Korpa</a><span>/</span><span aria-current="page">Checkout</span></nav>
+{% if completed_order %}
+<section class="cart-empty"><h1>Hvala na narudžbi!</h1><p>Vaša narudžba #{{ completed_order.pk }} je zaprimljena.</p><p>Ukupno s dostavom: <strong>{{ completed_order.total|floatformat:2 }} KM</strong></p><p>Kontaktirat ćemo vas radi potvrde dostave. Plaćanje nije izvršeno online.</p><a class="purchase" href="{% url 'home' %}">Nastavi kupovinu</a></section>
+{% else %}
+<div class="section-heading"><h1>Završetak narudžbe</h1><a href="{% url 'cart' %}">← Nazad u korpu</a></div>
+<form method="post" class="cart-layout checkout-form">{% csrf_token %}
+<section class="checkout-fields"><h2>Podaci za dostavu</h2>{{ form.non_field_errors }}<div class="checkout-field-grid">{% for field in form %}<div class="checkout-field{% if field.name == 'note' or field.name == 'address' %} checkout-field-wide{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div></section>
+<aside class="cart-summary"><h2>Vaša narudžba</h2>{% for item in cart_items %}<div class="checkout-line"><span>{{ item.product.name }} <small>× {{ item.quantity }}</small></span><strong>{{ item.subtotal|floatformat:2 }} KM</strong></div>{% endfor %}<p><span>Artikli</span><strong>{{ cart_total|floatformat:2 }} KM</strong></p>{% if loyalty_discount %}<p><span>Loyalty ({{ loyalty_percent|floatformat:2 }}%)</span><strong>−{{ loyalty_discount|floatformat:2 }} KM</strong></p>{% endif %}<p><span>Dostava</span><strong>{% if delivery_price == 0 %}Besplatna dostava{% else %}{{ delivery_price|floatformat:2 }} KM{% endif %}</strong></p><div class="cart-summary-total"><span>Ukupno</span><strong>{{ grand_total|floatformat:2 }} KM</strong></div><p class="cart-note">Dostava je uključena u ukupan iznos. Način plaćanja dogovaramo prilikom potvrde narudžbe.</p><button class="purchase" type="submit">Potvrdi narudžbu</button></aside>
+</form>{% endif %}
+</main>
+{% include 'shop/partials/bera_footer.html' %}{% include 'shop/partials/mobile_menu.html' %}
+<dialog id="notice"><p></p><button type="button">Zatvori</button></dialog>
+</body></html>
