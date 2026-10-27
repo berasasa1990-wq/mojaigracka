@@ -46,7 +46,7 @@ def env_list(name):
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
 if DEVELOPMENT:
-    ALLOWED_HOSTS += ['localhost', '127.0.0.1']
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1', 'https://mojaigracka.onrender.com']
 render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
 if render_hostname:
     ALLOWED_HOSTS.append(render_hostname)
