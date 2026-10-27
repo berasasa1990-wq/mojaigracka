@@ -1,3 +1,27 @@
+// Retry failed public media through the site's authenticated storage connection.
+(() => {
+  const header = document.getElementById('header');
+  const domain = header?.dataset.publicImageDomain;
+  const mediaUrl = header?.dataset.mediaUrl;
+  if (!domain || !mediaUrl) return;
+  const prefixes = ['brands/', 'categories/', 'products/', 'store/', 'banners/', 'seo/'];
+  function retryImage(image) {
+    if (!(image instanceof HTMLImageElement)) return;
+    let source;
+    try { source = new URL(image.currentSrc || image.src, window.location.href); } catch { return; }
+    if (source.hostname !== domain || image.dataset.imageFallbackSource === source.href) return;
+    const key = source.pathname.replace(/^\//, '');
+    if (!prefixes.some(prefix => key.startsWith(prefix))) return;
+    image.dataset.imageFallbackSource = source.href;
+    image.removeAttribute('srcset');
+    image.src = `${mediaUrl.replace(/\/$/, '')}/${key}?proxy=1`;
+  }
+  document.addEventListener('error', event => retryImage(event.target), true);
+  document.querySelectorAll('img').forEach(image => {
+    if (image.complete && image.naturalWidth === 0) retryImage(image);
+  });
+})();
+
 const notice = document.querySelector('#notice');
 function showNotice(message) { notice.querySelector('p').textContent = message; notice.showModal(); }
 document.querySelectorAll('[data-info]').forEach(button => button.addEventListener('click', () => showNotice(button.dataset.info)));
@@ -422,7 +446,6 @@ brandsDialog?.addEventListener('click', event => {
 // One shared clock for all visible promotion countdowns.
 const saleCountdowns = [...document.querySelectorAll('[data-sale-countdown]')];
 function updateSaleCountdowns() {
-  let expired = false;
   const now = Date.now();
   saleCountdowns.forEach(timer => {
     const end = Date.parse(timer.dataset.saleCountdown);
@@ -430,7 +453,6 @@ function updateSaleCountdowns() {
     const seconds = Math.max(0, Math.ceil((end - now) / 1000));
     if (!seconds) {
       timer.querySelector('[data-countdown-value]').textContent = 'Istekla';
-      expired = true;
       return;
     }
     const days = Math.floor(seconds / 86400);
@@ -439,12 +461,17 @@ function updateSaleCountdowns() {
     const pad = value => String(value).padStart(2, '0');
     timer.querySelector('[data-countdown-value]').textContent = `${days ? days + 'd ' : ''}${pad(hours)}:${pad(minutes)}:${pad(seconds % 60)}`;
   });
-  if (expired) { clearInterval(saleCountdownInterval); window.location.reload(); }
+  if (saleCountdowns.every(timer => {
+    const end = Date.parse(timer.dataset.saleCountdown);
+    return !Number.isFinite(end) || end <= now;
+  })) clearInterval(saleCountdownInterval);
 }
 let saleCountdownInterval;
 if (saleCountdowns.length) {
   saleCountdownInterval = setInterval(updateSaleCountdowns, 1000);
   updateSaleCountdowns();
+  // Restore countdown text after Back without reloading the saved page.
+  window.addEventListener('pageshow', updateSaleCountdowns);
 }
 
 const productZoomDialog = document.querySelector('#productZoomDialog');

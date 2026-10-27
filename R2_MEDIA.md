@@ -138,3 +138,23 @@ uploadova. Postojeći objekti nisu automatski kopirani niti obrisani.
 Službene reference:
 - https://django-storages.readthedocs.io/en/latest/backends/s3_compatible/cloudflare-r2.html
 - https://developers.cloudflare.com/r2/examples/aws/boto3/
+
+
+## Rezervno učitavanje javnih slika
+
+Storefront najprije koristi direktnu javnu media domenu. Ako preglednik ne uspije
+učitati sliku s konfigurirane domene, `home.js` jednom pokušava istu javnu putanju
+preko `/media/<key>?proxy=1`. Radi i za slike koje su već javile grešku prije
+učitavanja skripte te naknadno dodane slike. Drugi domeni se ne preusmjeravaju.
+
+Proxy čita postojeći objekt iz `public_images` storagea preko servera, vraća
+ispravan MIME i javni cache od jednog sata. Ne kopira, ne mijenja i ne briše
+objekte. Obični `/media/` linkovi zadržavaju postojeći redirect. Proxy dopušta
+samo postojeće javne prefikse i ekstenzije slike; ne prihvata proizvoljan udaljeni
+URL niti privatne putanje. Greške storage pristupa vraćaju 502 bez keširanja ili
+provider detalja; nedostajući objekti vraćaju 404.
+
+Na www.mojaigracka.com provjereni logo, banner i slika artikla vraćali su 200 i
+ispravno su dekodirani tokom dijagnostike. To potvrđuje postojanje tih objekata,
+ali ne utvrđuje uzrok greške u korisnikovom pregledniku. Rezervno učitavanje
+zahtijeva objavu ovih izmjena na serveru.

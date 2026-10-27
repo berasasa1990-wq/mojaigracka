@@ -182,3 +182,47 @@ class R2ProbeTests(SimpleTestCase):
             with self.assertRaises(CommandError) as error:
                 call_command('check_r2_images', upload=True, stdout=StringIO())
         self.assertNotIn('secret-marker', str(error.exception))
+
+
+@override_settings(R2_IMAGES_ENABLED=True)
+class PublicImageFallbackTests(TestCase):
+    def setUp(self):
+        self.remote = InMemoryStorage()
+        self.remote.save('products/example.avif', ContentFile(b'avif-artwork'))
+
+    def test_proxy_streams_saved_object_with_image_type_instead_of_redirect(self):
+        with patch('shop.storage.public_image_storage', return_value=self.remote):
+            response = self.client.get('/media/products/example.avif?proxy=1')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/avif')
+            self.assertNotIn('Location', response)
+            self.assertEqual(b''.join(response.streaming_content), b'avif-artwork')
+            self.assertEqual(response['Cache-Control'], 'public, max-age=3600')
+            response.close()
+
+    def test_proxy_rejects_private_traversal_and_non_image_paths(self):
+        self.remote.save('private/key.png', ContentFile(b'private'))
+        with patch('shop.storage.public_image_storage', return_value=self.remote) as storage:
+            for url in ['/media/private/key.png?proxy=1', '/media/products/../private/key.png?proxy=1',
+                        '/media/products/key.txt?proxy=1']:
+                self.assertEqual(self.client.get(url).status_code, 404)
+            storage.assert_not_called()
+
+    def test_missing_object_is_404_and_provider_failure_is_not_cached(self):
+        from botocore.exceptions import ClientError
+        with patch('shop.storage.public_image_storage', return_value=self.remote):
+            self.assertEqual(self.client.get('/media/products/missing.png?proxy=1').status_code, 404)
+        error = ClientError({'Error': {'Code': 'AccessDenied', 'Message': 'secret-marker'}}, 'GetObject')
+        with patch('shop.storage.public_image_storage') as storage:
+            storage.return_value.open.side_effect = error
+            with self.assertLogs('shop.media_views', level='WARNING') as logs:
+                response = self.client.get('/media/products/example.png?proxy=1')
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response['Cache-Control'], 'no-store')
+        self.assertNotIn('secret-marker', ' '.join(logs.output))
+        self.assertNotIn(b'secret-marker', response.content)
+
+    def test_header_exposes_configured_domain_only_for_image_retry(self):
+        self.remote.custom_domain = 'media.example.com'
+        with patch('shop.storage.public_image_storage', return_value=self.remote):
+            self.assertContains(self.client.get('/'), 'data-public-image-domain="media.example.com"')

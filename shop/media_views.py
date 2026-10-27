@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from django.conf import settings
-from django.http import Http404, HttpResponseRedirect
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect
 from django.utils.http import content_disposition_header
 from django.utils.html import strip_tags
 from django.utils.text import slugify
@@ -30,6 +30,34 @@ def public_image(request, path, **kwargs):
         from .storage import PUBLIC_PREFIXES, public_image_storage
         if not path.startswith(PUBLIC_PREFIXES) or '..' in Path(path).parts or '\\' in path:
             raise Http404('Slika nije pronađena.')
+        if request.GET.get('proxy') == '1':
+            import logging
+            import mimetypes
+            from botocore.exceptions import BotoCoreError, ClientError
+            try:
+                image = public_image_storage().open(path, 'rb')
+            except (FileNotFoundError, OSError):
+                raise Http404('Slika nije pronađena.') from None
+            except ClientError as error:
+                code = str(error.response.get('Error', {}).get('Code', ''))
+                if code in ('404', 'NoSuchKey', 'NotFound'):
+                    raise Http404('Slika nije pronađena.') from None
+                logging.getLogger(__name__).warning('public_image_proxy storage_unavailable')
+                response = HttpResponse(status=502)
+                response['Cache-Control'] = 'no-store'
+                return response
+            except BotoCoreError:
+                logging.getLogger(__name__).warning('public_image_proxy storage_unavailable')
+                response = HttpResponse(status=502)
+                response['Cache-Control'] = 'no-store'
+                return response
+            content_type = mimetypes.guess_type(path)[0] or 'application/octet-stream'
+            response = FileResponse(image, content_type=content_type)
+            response['Content-Disposition'] = content_disposition_header(False, image_download_name(path))
+            response['Cache-Control'] = 'public, max-age=3600'
+            response['X-Content-Type-Options'] = 'nosniff'
+            response['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+            return response
         # Preserve old public media links without copying private files to R2.
         return HttpResponseRedirect(public_image_storage().url(path))
     response = serve(request, path, document_root=settings.MEDIA_ROOT)

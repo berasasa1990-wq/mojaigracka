@@ -31,3 +31,15 @@ def all_store_brands():
 def panel_css_version():
     from django.conf import settings
     return (settings.BASE_DIR / 'shop/static/css/panel.css').stat().st_mtime_ns
+
+
+@register.simple_tag
+def public_image_domain():
+    from shop.storage import public_image_storage
+    return getattr(public_image_storage(), 'custom_domain', '') or ''
+
+
+@register.simple_tag
+def public_media_url():
+    from django.conf import settings
+    return settings.MEDIA_URL
