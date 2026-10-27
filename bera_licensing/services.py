@@ -7,6 +7,7 @@ from django.db import DatabaseError
 from django.db.models import Q
 from django.utils import timezone
 from .client import fetch_license
+from .credentials import installation_id, centrally_managed
 from .models import LicenseState
 from .registry import MODULES
 from .security import LicenseError, verify_document
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def sync_license(*, force=False):
-    installation = settings.BERA_LICENSE_INSTALLATION_ID
+    installation = installation_id()
     if not installation:
         raise LicenseError('missing_configuration')
     state, _ = LicenseState.objects.get_or_create(installation_id=installation)
@@ -56,7 +57,7 @@ def sync_license(*, force=False):
 
 def license_details():
     try:
-        state = LicenseState.objects.filter(installation_id=settings.BERA_LICENSE_INSTALLATION_ID).first()
+        state = LicenseState.objects.filter(installation_id=installation_id()).first()
         if state is None or not state.document:
             return None
         issued, expires, grace = verify_document(state.document)
@@ -69,9 +70,20 @@ def license_details():
 
 
 def module_enabled(code):
+    from bera_control.services import local_allows
+    if not local_allows(code):
+        return False
     if code not in MODULES:
         return False
-    if code not in settings.BERA_LICENSE_ENFORCED_MODULES:
+    from bera_control.models import ModuleActivation
+    from .registry import IMPLEMENTED
+    activation = ModuleActivation.objects.filter(module=code).first()
+    if activation is not None:
+        return bool(code in IMPLEMENTED and activation.activated_at is not None and (activation.expires_at is None or timezone.now() < activation.expires_at))
+    from .registry import PAID_SALE_MODULES
+    if code in PAID_SALE_MODULES:
+        return False  # Paid promotions require an owner-issued, redeemed local code.
+    if code not in settings.BERA_LICENSE_ENFORCED_MODULES and not centrally_managed():
         # Only the existing Loyalty behavior is preserved during staged rollout.
         if code == 'loyalty':
             from shop.modules import legacy_loyalty_enabled
@@ -85,3 +97,34 @@ def require_module(code):
     """Use in business operations and jobs; no HTTP dependency."""
     if not module_enabled(code):
         raise PermissionDenied('Modul nije aktivan.')
+
+
+from django.views.decorators.debug import sensitive_variables
+
+
+@sensitive_variables()
+def activate_license(installation, activation_code):
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from .credentials import cipher, connection
+    from .client import activate_remote
+    from .models import LicenseConnection
+    if not isinstance(installation, str) or not installation.strip() or len(installation) > 200 or not isinstance(activation_code, str) or not activation_code.strip() or len(activation_code) > 512:
+        raise LicenseError('invalid_activation_input')
+    installation = installation.strip()
+    # Do not consume a one-time code unless local encryption and trust are ready.
+    encryption = cipher()
+    try:
+        Ed25519PublicKey.from_public_bytes(base64.b64decode(settings.BERA_LICENSE_PUBLIC_KEY, validate=True))
+    except (ValueError, TypeError):
+        raise LicenseError('invalid_public_key_configuration') from None
+    if connection():
+        raise LicenseError('already_activated')
+    result = activate_remote(installation, activation_code.strip())
+    credential = result.get('api_credential') if isinstance(result, dict) else None
+    if not isinstance(credential, str) or not credential or len(credential) > 8192 or any(c in credential for c in '\r\n'):
+        raise LicenseError('invalid_activation_response')
+    # Only the credential is accepted; public keys/documents in this response are ignored.
+    LicenseConnection.objects.create(pk=1, installation_id=installation,
+        encrypted_credential=encryption.encrypt(credential.encode()).decode('ascii'))
+    return sync_license(force=True)

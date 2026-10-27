@@ -1,4 +1,9 @@
 {% for hero_banner in hero_banners %}
+{% if hero_banner.image %}
+<section class="bera-uploaded-hero" aria-label="{{ hero_banner.title }}">
+  {% if hero_banner.url %}<a href="{{ hero_banner.url }}">{% endif %}<img src="{{ hero_banner.image.url }}" alt="{{ hero_banner.title }}" width="1600" height="600"{% if forloop.first %} fetchpriority="high"{% else %} loading="lazy"{% endif %}>{% if hero_banner.url %}</a>{% endif %}
+</section>
+{% else %}
 <section class="bera-hero bera-hero--custom" aria-labelledby="customHeroTitle{{ hero_banner.pk }}">
   <div class="bera-hero-inner{% if hero_banner.image or hero_banner.secondary_image %} bera-hero-inner--art{% endif %}">
     <div class="bera-hero-copy">
@@ -14,4 +19,5 @@
     </div>{% endif %}
   </div>
 </section>
+{% endif %}
 {% endfor %}

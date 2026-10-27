@@ -1,0 +1,12 @@
+<form action="{% url 'stock_notification_subscribe' product.pk %}" method="post" class="stock-notification-form">
+  {% csrf_token %}
+  {% if request.user.is_authenticated and request.user.email %}
+  <button type="submit" class="purchase">Obavijesti pri dolasku</button>
+  {% else %}
+  <details><summary class="purchase">Obavijesti pri dolasku</summary>
+    <label>Email za obavijest <input type="email" name="email" required maxlength="254" autocomplete="email" placeholder="vas@email.com"></label>
+    <button type="submit" class="purchase">Prijavi obavijest</button>
+  </details>
+  {% endif %}
+  <p role="status" aria-live="polite" class="stock-notification-status" hidden></p>
+</form>

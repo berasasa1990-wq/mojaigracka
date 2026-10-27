@@ -1,0 +1,36 @@
+{% load tz %}
+    <section class="panel-content">
+      <div class="content-heading{% if section == 'orders' %} wms-orders-toolbar{% endif %}"><h2>Narudžbe</h2><nav class="panel-order-filters" aria-label="Filter narudžbi">
+        <a href="?status=nove&amp;q={{ order_query|urlencode }}"{% if order_filter == 'nove' %} class="is-active" aria-current="page"{% endif %}>Nove</a>
+        <a href="?status=poslate&amp;q={{ order_query|urlencode }}"{% if order_filter == 'poslate' %} class="is-active" aria-current="page"{% endif %}>Poslate</a>
+        <a href="?status=sve&amp;q={{ order_query|urlencode }}"{% if order_filter == 'sve' %} class="is-active" aria-current="page"{% endif %}>Sve</a>
+      </nav>
+    {% if section == 'orders' %}
+    <form id="bulkPrintForm" action="{% url 'wms:orders_bulk_print' %}" method="get" target="_blank" class="wms-bulk-print">
+      <label><input type="checkbox" id="selectAllOrders"> Označi sve</label>
+      <button type="submit" class="home-link" id="bulkPrintButton" title="Štampaj odabrane narudžbe" aria-label="Štampaj odabrane narudžbe" disabled><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H3V9h18v9h-3"/><path d="M6 14h12v7H6zM17 11h1"/></svg><span id="selectedOrderCount" aria-live="polite">0</span></button>
+    </form>
+    {% endif %}
+{% if section == 'orders' %}
+      <form method="get" class="wms-order-search">
+        <input type="hidden" name="status" value="{{ order_filter }}">
+        <label class="wms-sr-only" for="orderSearch">Ime, telefon ili broj narudžbe</label>
+        <input id="orderSearch" type="search" name="q" value="{{ order_query }}" placeholder="Ime, telefon ili broj narudžbe…">
+        <button class="home-link" type="submit" aria-label="Pretraži narudžbe" title="Pretraži"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button>
+      </form>
+      {% endif %}<span>{{ orders|length }} prikazano · {{ pending_orders_count }} novih</span></div>
+      <div class="panel-users-scroll"><table class="panel-users">
+        <thead><tr><th>Broj / datum</th><th>Kupac</th><th>Plaćanje</th><th class="panel-order-items-column">Artikli</th><th>Ukupno</th><th>Status</th><th>Akcija</th></tr></thead>
+        <tbody>{% for order in orders %}<tr>
+          <td data-label="Broj / datum"><div class="wms-order-cell">{% if section == 'orders' %}<label class="wms-order-select"><input type="checkbox" name="orders" value="{{ order.pk }}" form="bulkPrintForm" data-print-select aria-label="Odaberi narudžbu #{{ order.pk }}"> #{{ order.pk }}</label>{% else %}#{{ order.pk }}{% endif %}<br>{{ order.created_at|localtime|date:"d.m.Y. H:i" }}</div></td>
+          <td data-label="Kupac"><div class="wms-order-cell"><div class="panel-order-customer">{{ order.customer_name|default:'—' }} <button type="button" class="panel-card-info" data-order-preview="{{ order.pk }}" data-customer-only="true" title="Podaci kupca" aria-label="Podaci kupca za narudžbu #{{ order.pk }}" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v2"/></svg></button></div></div></td>
+          <td data-label="Plaćanje"><div class="wms-order-cell">Gotovinski</div></td>
+          <td class="panel-order-items-column" data-label="Artikli"><div class="wms-order-cell">{% for item in order.items.all %}{{ item.quantity }} × {{ item.product.name }}{% if not forloop.last %}<br>{% endif %}{% empty %}Nema stavki.{% endfor %}</div></td>
+          <td data-label="Ukupno"><div class="wms-order-cell">{{ order.total|floatformat:2 }} KM</div></td>
+          <td data-label="Status"><div class="wms-order-cell">{{ order.get_status_display }}{% if section == 'orders' %}<small class="wms-print-status{% if order.printed_at %} is-printed{% endif %}">{% if order.printed_at %}Odštampano · {{ order.printed_at|localtime|date:"d.m.Y. H:i" }}{% else %}Nije odštampano{% endif %}</small>{% endif %}</div></td>
+          <td data-label="Akcija"><div class="wms-order-cell"><div class="panel-order-actions"><button type="button" class="panel-pack-button" data-order-preview="{{ order.pk }}" title="Pregled narudžbe" aria-label="Pregled narudžbe #{{ order.pk }}" aria-haspopup="dialog"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>{% if section != 'orders' and order.status == 'placed' %}
+            <form method="post" onsubmit="return confirm('Želite li da označite narudžbu da je zapakovana?');">{% csrf_token %}<input type="hidden" name="order_id" value="{{ order.pk }}"><input type="hidden" name="action" value="pack"><button type="submit" class="panel-pack-button" title="Označi kao zapakovano" aria-label="Označi narudžbu #{{ order.pk }} kao zapakovanu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5v8l-9 5-9-5V8z"/><path d="m3 8 9 5 9-5M12 13v8M7.5 5.5l9 5V15"/></svg></button></form>
+          {% endif %}</div></div></td>
+        </tr>{% empty %}<tr><td colspan="7">Trenutno nema narudžbi.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>

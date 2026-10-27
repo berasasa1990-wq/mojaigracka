@@ -1,0 +1,24 @@
+    {% if description_form %}
+    <section class="panel-content edit-panel meta-description-settings" id="meta-description">
+      <details class="settings-disclosure"{% if description_form.errors %} open{% endif %}><summary>Meta opis sajta</summary>
+      <p class="loyalty-hint">Kratak opis koji pretraživači mogu prikazati ispod naslova stranice. Unesite oko 150–160 znakova. Koristi se na početnoj i stranicama bez vlastitog SEO opisa.</p>
+      <form method="post">{% csrf_token %}<input type="hidden" name="settings_section" value="meta_description">{{ description_form.non_field_errors }}
+        <div class="form-field">{{ description_form.description.label_tag }}{{ description_form.description }}{{ description_form.description.errors }}</div>
+        <div class="form-actions"><button class="home-link save-button" type="submit">Spremi meta opis</button></div>
+      </form>
+      </details>
+    </section>
+    {% endif %}
+    {% if seo_form %}
+    <section class="panel-content edit-panel seo-settings-panel">
+      <details class="settings-disclosure"{% if seo_form.errors %} open{% endif %}><summary>SEO sajta i društvene mreže</summary>
+      <p class="seo-settings-intro">Uredite prikaz sajta na pretraživačima i pri dijeljenju linkova. Artikli i kategorije imaju i vlastita SEO polja u svojim obrascima.</p>
+      <div class="seo-tools"><a class="home-link" href="{% url 'seo_sitemap' %}" target="_blank" rel="noopener">Otvori sitemap.xml ↗</a><a class="home-link" href="{% url 'seo_robots' %}" target="_blank" rel="noopener">Otvori robots.txt ↗</a></div>
+      <div class="seo-search-preview" aria-label="Primjer izgleda u pretrazi"><small>PRIMJER PRIKAZA U PRETRAZI</small><span id="seoPreviewDomain"></span><strong id="seoPreviewTitle"></strong><p id="seoPreviewDescription"></p></div>
+      <form method="post" enctype="multipart/form-data" class="panel-edit-form">{% csrf_token %}<input type="hidden" name="settings_section" value="seo">{{ seo_form.non_field_errors }}
+      {% for field in seo_form %}<div class="form-field{% if field.field.widget.input_type == 'checkbox' %} form-field--checkbox{% endif %}">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}
+      <div class="form-actions"><button class="home-link save-button" type="submit">Spremi SEO postavke</button></div></form>
+      <p class="seo-settings-intro">Promjene vrijede odmah. Pretraživači odlučuju kada će ponovo posjetiti sajt i kako će prikazati rezultate. Privatne stranice automatski imaju noindex.</p>
+      </details>
+    </section>
+    {% endif %}

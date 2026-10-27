@@ -1,3 +1,4 @@
+from unittest.mock import patch, PropertyMock
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -8,6 +9,10 @@ from .cart import priced_items, quantity_offers
 
 class QuantitySaleTests(TestCase):
     def setUp(self):
+        from bera_control.services import issue_module_code, display_activation_code, redeem_module_code
+        for module in ('article_plus', 'quantity', 'bundle'):
+            activation = issue_module_code(module)
+            redeem_module_code(module, display_activation_code(activation))
         self.product = Product.objects.create(name='Najlon', price=100, stock=10, sale_type='quantity', quantity_percent_2=10, quantity_percent_3=15, quantity_percent_over_3=20)
 
     def test_boundaries_and_rounding(self):
@@ -49,8 +54,15 @@ class QuantitySaleTests(TestCase):
         self.assertEqual(item.quantity, 4)
         self.assertEqual(item.unit_price, 80)
         self.assertEqual(item.order.total, 320)
+        self.assertIn('Količinsko sniženje: 4 kom', item.promotion)
+        self.assertIn('20%', item.promotion)
+        self.product.quantity_percent_over_3 = 5
+        self.product.save()
+        item.refresh_from_db()
+        self.assertIn('20%', item.promotion)
 
-    def test_offers_respect_stock(self):
+    @patch('shop.models.Product.wms_enabled', new_callable=PropertyMock, return_value=True)
+    def test_offers_respect_stock(self, wms):
         self.product.stock = 2
         self.assertEqual([offer['quantity'] for offer in quantity_offers(self.product, 1)], [2])
 

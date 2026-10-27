@@ -1,0 +1,33 @@
+{% load static panel_tags %}
+<!doctype html>
+<html lang="bs">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}WMS – Upravljanje skladištem{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/panel.css' %}?v={% panel_css_version %}">
+  <link rel="stylesheet" href="{% static 'wms/wms.css' %}?v=8">
+</head>
+<body class="wms-body">
+<header class="panel-header wms-header">
+  <a class="panel-brand" href="{% url 'wms:dashboard' %}">{% if site_settings.logo %}<img src="{{ site_settings.logo.url }}" alt="Logo trgovine" width="48" height="52">{% endif %}<span>WMS <small>Upravljanje skladištem</small></span></a>
+  <div class="panel-header-actions"><a class="home-link" href="{% url 'panel' %}">Kontrolni panel</a><a class="home-link" href="{% url 'home' %}">Pogledaj trgovinu</a></div>
+</header>
+<div class="wms-layout">
+  <aside class="wms-sidebar">
+    <p class="eyebrow">SKLADIŠTE</p>
+    <nav aria-label="WMS opcije">
+      {% new_orders_count as wms_new_orders_count %}
+      <a href="{% url 'wms:history' %}"{% if section == 'history' %} class="is-active" aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7.4"/><path d="M3 4v7h7"/></svg>Istorija</a>
+      <a href="{% url 'wms:dashboard' %}"{% if section == 'articles' %} class="is-active" aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8"/></svg>Artikli</a>
+      <a href="{% url 'wms:orders' %}"{% if section == 'orders' %} class="is-active" aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg><span class="wms-orders-label">Narudžbe{% if wms_new_orders_count %}<span class="wms-orders-count" aria-label="{{ wms_new_orders_count }} novih narudžbi">{{ wms_new_orders_count }}</span>{% endif %}</span></a>
+      <a href="{% url 'wms:locations' %}"{% if section == 'locations' %} class="is-active" aria-current="page"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 7v10M7 12h10"/></svg>Lokacije</a>
+    </nav>
+    <div class="wms-sidebar-note">Pregled zaliha i skladišnih lokacija vaše trgovine.</div>
+  </aside>
+  <main class="wms-main">
+    {% for message in messages %}<p class="panel-feedback" role="status">{{ message }}</p>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

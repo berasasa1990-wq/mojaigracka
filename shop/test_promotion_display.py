@@ -4,6 +4,9 @@ from .models import Product
 
 class PromotionDisplayTests(TestCase):
     def setUp(self):
+        from bera_control.services import issue_module_code, display_activation_code, redeem_module_code
+        activation = issue_module_code('article_plus')
+        redeem_module_code('article_plus', display_activation_code(activation))
         self.second = Product.objects.create(name='Najlon za akciju', price=20)
         self.first = Product.objects.create(name='Štap za akciju', price=100, sale_type='article_plus', plus_product=self.second, plus_percent=25)
 
@@ -13,7 +16,8 @@ class PromotionDisplayTests(TestCase):
             self.assertContains(response, 'Ponuda +')
             if path == self.first.get_absolute_url():
                 self.assertContains(response, '25% popusta na')
-                self.assertContains(response, self.second.get_absolute_url())
+                self.assertContains(response, 'data-plus-preview-open')
+                self.assertContains(response, self.second.name)
             else:
                 self.assertNotContains(response, '25% popusta na')
         self.assertNotContains(self.client.get(self.second.get_absolute_url()), '25% popusta na')

@@ -1,0 +1,12 @@
+{% load tz %}
+<main class="sheet">
+<header><div><h1>Narudžba #{{ order.pk }}</h1><p>{{ order.created_at|localtime|date:"d.m.Y. H:i" }}</p></div>{% if site_settings.logo %}<img src="{{ site_settings.logo.url }}" alt="Logo trgovine">{% endif %}</header>
+<div class="customer"><section><h2>Kupac</h2><p><strong>{{ order.customer_name|default:'—' }}</strong></p>{% if order.phone %}<p>{{ order.phone }}</p>{% endif %}{% if order.email %}<p>{{ order.email }}</p>{% endif %}</section><section><h2>Adresa dostave</h2><address>{{ order.address|default:'—' }}<br>{{ order.postal_code }} {{ order.city }}</address></section></div>
+<p><strong>Način plaćanja:</strong> Gotovinski</p>
+<table><thead><tr><th>Artikal</th><th>Količina</th><th>Cijena (KM)</th><th>Iznos (KM)</th></tr></thead><tbody>
+{% for item in items %}<tr><td>{{ item.product.name }}{% if item.promotion %}<small>{{ item.promotion }}</small>{% endif %}</td><td>{{ item.quantity }}</td><td>{{ item.unit_price|floatformat:2 }}</td><td>{{ item.line_total|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4">Narudžba nema stavki.</td></tr>{% endfor %}
+</tbody></table>
+<div class="summary"><p><span>Ukupno artikli</span><strong>{{ subtotal|floatformat:2 }} KM</strong></p>{% if order.loyalty_discount %}<p><span>Loyalty popust i bodovi</span><strong>−{{ order.loyalty_discount|floatformat:2 }} KM</strong></p>{% endif %}<p><span>Dostava</span><strong>{{ order.delivery_price|floatformat:2 }} KM</strong></p><p class="total"><span>Ukupno za plaćanje</span><strong>{{ order.total|floatformat:2 }} KM</strong></p><small>PDV je uključen u cijenu.</small></div>
+{% if order.note %}<section class="note"><h2>Napomena kupca</h2><p>{{ order.note|linebreaksbr }}</p></section>{% endif %}
+<footer>Hvala na kupovini!</footer>
+</main>

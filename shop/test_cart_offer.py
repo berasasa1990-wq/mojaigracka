@@ -4,6 +4,9 @@ from .models import Product
 
 class CartOfferTests(TestCase):
     def setUp(self):
+        from bera_control.services import issue_module_code, display_activation_code, redeem_module_code
+        activation = issue_module_code('article_plus')
+        redeem_module_code('article_plus', display_activation_code(activation))
         self.second = Product.objects.create(name='Najlon', price=20, stock=5)
         self.first = Product.objects.create(name='Štap', price=100, stock=5, sale_type='article_plus', plus_product=self.second, plus_percent=25)
 
@@ -40,3 +43,11 @@ class CartOfferTests(TestCase):
 
     def test_regular_product_has_no_offer(self):
         self.assertIsNone(self.add(self.second).json()['offer'])
+
+    def test_plus_promotion_identifies_anchor_and_only_discounted_units(self):
+        from .cart import priced_items
+        item = next(item for item in priced_items([self.first, self.second], {str(self.first.pk): 1, str(self.second.pk): 2}) if item['product'] == self.second)
+        discounted, regular = item['promotion_groups']
+        self.assertEqual(discounted[:2], (15, 1))
+        self.assertIn('Ponuda +: Štap', discounted[2])
+        self.assertEqual(regular, (20, 1, ''))

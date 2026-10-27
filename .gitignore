@@ -33,3 +33,7 @@ media/
 
 # macOS
 .DS_Store
+
+# Production build and virtual environments
+.venv/
+staticfiles/

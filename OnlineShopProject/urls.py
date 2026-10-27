@@ -15,25 +15,47 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from shop.module_api import update_loyalty_module
 from shop.admin_sso import admin_sso_login
-from shop.views import panel_backup_restore, panel_banner_delete, home, panel, panel_edit, PanelLoginView, PanelLogoutView, product_detail, search_suggestions, cart, cart_update, checkout, account, customer_login, customer_register, customer_logout, wishlist_page, cart_loyalty
+from shop.views import panel_backup_restore, panel_banner_delete, home, panel, panel_edit, PanelLoginView, PanelLogoutView, product_detail, search_suggestions, cart, cart_update, cart_add_bundle, checkout, account, customer_login, customer_register, customer_logout, wishlist_page, cart_loyalty
 
-from bera_licensing.views import request_activation
+from bera_licensing.views import request_activation, activate, sync_now, activate_module_code
+
+from shop.views import bonus_reward_add, loyalty_page, customer_csrf_token, stock_notification_subscribe
+
+from shop.seo import robots, sitemap
+from shop.chatbot import chat
+
+from shop.media_views import product_share_image
 
 urlpatterns = [
+    path('artikal/<int:pk>/share.jpg', product_share_image, name='product_share_image'),
+    path('bonus-nagrada/<int:pk>/dodaj/', bonus_reward_add, name='bonus_reward_add'),
+    path('artikal/<int:pk>/obavijest/', stock_notification_subscribe, name='stock_notification_subscribe'),
+    path('wms/', include('wms.urls')),
+    path('api/chatbot/', chat, name='chatbot_message'),
+    path('robots.txt', robots, name='seo_robots'),
+    path('sitemap.xml', sitemap, name='seo_sitemap'),
+    path('sitemap-<slug:section>-<int:page>.xml', sitemap, name='seo_sitemap_section'),
+    path('panel/moduli/aktiviraj-kod/', activate_module_code, name='bera_module_code_activate'),
+    path('bera-control/', include('bera_control.urls')),
+    path('panel/moduli/licenca/aktivacija/', activate, name='bera_license_activate'),
+    path('panel/moduli/licenca/provjera/', sync_now, name='bera_license_sync'),
+    path('loyalty/', loyalty_page, name='loyalty'),
     path('panel/moduli/aktivacija/', request_activation, name='bera_activation'),
     path('api/modules/loyalty/', update_loyalty_module, name='module_loyalty'),
     path('admin/sso/', admin_sso_login, name='admin_sso_login'),
     path('korpa/loyalty/', cart_loyalty, name='cart_loyalty'),
     path('lista-zelja/', wishlist_page, name='wishlist'),
+    path('nalog/csrf/', customer_csrf_token, name='customer_csrf_token'),
     path('nalog/', account, name='account'),
     path('nalog/prijava/', customer_login, name='customer_login'),
     path('nalog/registracija/', customer_register, name='customer_register'),
     path('nalog/odjava/', customer_logout, name='customer_logout'),
     path('checkout/', checkout, name='checkout'),
     path('korpa/', cart, name='cart'),
+    path('korpa/set/<int:pk>/', cart_add_bundle, name='cart_add_bundle'),
     path('korpa/<int:pk>/', cart_update, name='cart_update'),
     path('', home, name='home'),
     path('pretraga/prijedlozi/', search_suggestions, name='search_suggestions'),
@@ -56,7 +78,12 @@ urlpatterns = [
 ]
 
 from django.conf import settings
-from django.conf.urls.static import static
+from django.urls import re_path
+from urllib.parse import urlsplit
+import re
+from shop.media_views import public_image, product_share_image
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Image downloads retain their URL and use the site's SEO name as the filename.
+media_prefix = urlsplit(settings.MEDIA_URL).path.lstrip('/')
+if media_prefix:
+    urlpatterns += [re_path(r'^' + re.escape(media_prefix) + r'(?P<path>.*)$', public_image)]

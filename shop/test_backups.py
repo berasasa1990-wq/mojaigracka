@@ -35,3 +35,28 @@ class BackupTests(SimpleTestCase):
                 corrupt.write_text('invalid')
                 with self.assertRaises(sqlite3.DatabaseError):
                     backups.restore_backup(corrupt.name)
+
+    def test_retention_removes_only_backups_older_than_three_days(self):
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        with TemporaryDirectory() as directory, override_settings(DATABASE_BACKUP_DIR=Path(directory)):
+            def copy_at(age, suffix=''):
+                stamp = (now - age).strftime('%Y%m%d_%H%M%S_%f')
+                path = Path(directory) / f'backup_{stamp}{suffix}.sqlite3'
+                path.touch()
+                return path
+
+            old = copy_at(timedelta(days=4))
+            old_safety = copy_at(timedelta(days=4), '_before_restore')
+            recent = copy_at(timedelta(days=2))
+            boundary = copy_at(timedelta(days=3))
+            unrelated = Path(directory) / 'manual.sqlite3'
+            unrelated.touch()
+            with patch.object(backups.time, 'time', return_value=now.timestamp()):
+                backups.prune_backups()
+            self.assertFalse(old.exists())
+            self.assertFalse(old_safety.exists())
+            self.assertTrue(recent.exists())
+            self.assertTrue(boundary.exists())
+            self.assertTrue(unrelated.exists())

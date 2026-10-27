@@ -14,6 +14,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 INTERVAL = 3600
+RETENTION = 3 * 24 * 3600
 _started = False
 _start_lock = threading.Lock()
 NAME = re.compile(r'backup_\d{8}_\d{6}_\d{6}(?:_before_restore)?\.sqlite3\Z')
@@ -52,6 +53,18 @@ def list_backups():
     ], key=lambda item: item['name'], reverse=True)
 
 
+def _prune_backups():
+    cutoff = time.time() - RETENTION
+    for copy in list_backups():
+        if copy['created'].timestamp() < cutoff:
+            (backup_dir() / copy['name']).unlink(missing_ok=True)
+
+
+def prune_backups():
+    with backup_lock():
+        _prune_backups()
+
+
 def _create_backup(safety=False):
     source_path = database_path()
     if not source_path.is_file():
@@ -73,8 +86,11 @@ def _create_backup(safety=False):
 def create_backup_if_due():
     with backup_lock():
         copies = list_backups()
+        target = None
         if not copies or time.time() - (backup_dir() / copies[0]['name']).stat().st_mtime >= INTERVAL:
-            return _create_backup()
+            target = _create_backup()
+        _prune_backups()
+        return target
 
 
 def restore_backup(name):

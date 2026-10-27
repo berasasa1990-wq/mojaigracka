@@ -1,0 +1,14 @@
+{% extends 'wms/base.html' %}
+{% block content %}
+<div class="wms-heading"><div><p class="eyebrow">WMS / LOKACIJE</p><h1>Lokacije</h1><p>Pregled skladišnih lokacija, broja artikala i količina na stanju.</p></div></div>
+<section class="panel-content wms-form-section">
+<form method="post" class="wms-form">{% csrf_token %}<h2>Kreiraj lokaciju</h2>{{ form.non_field_errors }}<div class="wms-field">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}<small>{{ form.name.help_text }}</small></div><div class="wms-form-actions"><button class="home-link wms-primary" type="submit">Kreiraj lokaciju</button></div></form>
+</section>
+<section class="panel-content">
+  <div class="content-heading"><h2>Skladišne lokacije</h2><form class="wms-search" method="get"><label class="wms-sr-only" for="search">Pretraga lokacija</label><input type="search" id="search" name="q" value="{{ query }}" placeholder="Pretraži lokacije…"><button class="home-link" type="submit">Pretraži</button>{% if query %}<a class="home-link" href="{% url 'wms:locations' %}">Poništi</a>{% endif %}</form></div>
+  <div class="wms-table-scroll"><table class="wms-table wms-mobile-cards"><thead><tr><th>Lokacija</th><th>Broj artikala</th><th>Količina na stanju</th><th></th></tr></thead><tbody>
+  {% for location in page_obj %}<tr><td data-label="Lokacija"><div class="wms-cell-value"><strong>{{ location.name }}</strong></div></td><td data-label="Broj artikala"><div class="wms-cell-value">{{ location.product_count }}</div></td><td data-label="Na stanju"><div class="wms-cell-value">{{ location.stock_total }} kom.</div></td><td data-label=""><div class="wms-cell-value"><a class="wms-text-link" href="{% url 'wms:dashboard' %}?q={{ location.name|urlencode }}">Pogledaj artikle</a></div></td></tr>{% empty %}<tr><td colspan="4" class="wms-empty">Nema lokacija za prikaz. Kreirajte lokaciju koristeći obrazac iznad.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if page_obj.has_other_pages %}<nav class="wms-pagination" aria-label="Stranice lokacija">{% if page_obj.has_previous %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Prethodna</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.next_page_number }}">Sljedeća</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}

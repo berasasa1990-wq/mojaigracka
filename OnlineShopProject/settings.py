@@ -10,26 +10,56 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import secrets
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# Production is the default. Local development must explicitly opt in.
+DEVELOPMENT = os.environ.get('DJANGO_ENV', 'production') == 'development'
+ON_RENDER = os.environ.get('RENDER', '').lower() == 'true'
+if ON_RENDER and DEVELOPMENT:
+    raise ImproperlyConfigured('DJANGO_ENV=development is forbidden on Render.')
+DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', '1', 'yes')
+if DEBUG and not DEVELOPMENT:
+    raise ImproperlyConfigured('DEBUG requires DJANGO_ENV=development.')
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
+if not SECRET_KEY:
+    if DEVELOPMENT:
+        # Process-local development key; never used in production.
+        SECRET_KEY = secrets.token_urlsafe(64)
+    else:
+        raise ImproperlyConfigured('SECRET_KEY is required in production.')
+if not DEVELOPMENT and (len(SECRET_KEY) < 50 or SECRET_KEY.startswith('django-insecure-')):
+    raise ImproperlyConfigured('Production SECRET_KEY must be a strong random key of at least 50 characters.')
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)8y=9f59(o89j5ema0_6@w#$8@s2z8_=su7ds*f%71pz_2*7=1'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def env_list(name):
+    return [value.strip() for value in os.environ.get(name, '').split(',') if value.strip()]
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    "192.168.1.105",
-]
+
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
+if DEVELOPMENT:
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1']
+render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if render_hostname:
+    ALLOWED_HOSTS.append(render_hostname)
+if not DEVELOPMENT and (not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS):
+    raise ImproperlyConfigured('Configure explicit production ALLOWED_HOSTS.')
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
+if render_hostname:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{render_hostname}')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = not DEVELOPMENT
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 0  # Enable only after HTTPS and the domain have been verified.
+X_FRAME_OPTIONS = 'DENY'
 
 
 # Application definition
@@ -42,16 +72,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'shop',
+    'wms.apps.WmsConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'shop.seo.SEORobotsMiddleware',
+    'shop.promotions.PromotionExpiryMiddleware',
 ]
 
 ROOT_URLCONF = 'OnlineShopProject.urls'
@@ -62,6 +96,9 @@ TEMPLATES = [
         'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
+            'libraries': {
+                'brand_logos': 'shop.templatetags.brand_logos',
+            },
             'context_processors': [
                 'django.template.context_processors.request',
                 'shop.cart.cart_context',
@@ -78,12 +115,21 @@ WSGI_APPLICATION = 'OnlineShopProject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
+database_url = os.environ.get('DATABASE_URL', '').strip()
+if database_url:
+    if not database_url.startswith(('postgres://', 'postgresql://')):
+        raise ImproperlyConfigured('DATABASE_URL must reference PostgreSQL.')
+    DATABASES = {'default': dj_database_url.parse(
+        database_url, conn_max_age=600, conn_health_checks=True,
+        ssl_require=not DEVELOPMENT,
+    )}
+elif DEVELOPMENT:
+    DATABASES = {'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+    }}
+else:
+    raise ImproperlyConfigured('Production requires a persistent PostgreSQL DATABASE_URL.')
 
 
 # Password validation
@@ -120,14 +166,22 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage' if DEVELOPMENT
+        else 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', str(BASE_DIR / 'media')))
 
 
 # Shared server-only key for short-lived admin SSO tokens.
-import os
 _admin_sso_key_file = BASE_DIR / '.secrets' / 'admin_sso_key'
 ADMIN_SSO_KEY = os.environ.get('ADMIN_SSO_KEY', '') or (_admin_sso_key_file.read_text().strip() if _admin_sso_key_file.exists() else '')
 ADMIN_SSO_USERNAME = os.environ.get('ADMIN_SSO_USERNAME', 'Bera1990')
@@ -138,7 +192,7 @@ MODULE_CONTROL_KEY = os.environ.get('MODULE_CONTROL_KEY', '') or (_module_key_fi
 # Staged licensing: empty enforcement list preserves existing installations.
 INSTALLED_APPS += ['bera_licensing']
 TEMPLATES[0]['OPTIONS']['context_processors'] += ['bera_licensing.context_processors.licensing_context']
-BERA_LICENSE_SERVER_URL = os.environ.get('BERA_LICENSE_SERVER_URL', 'https://bera-it.com/api/v1/licensing/')
+BERA_LICENSE_SERVER_URL = os.environ.get('BERA_LICENSE_SERVER_URL', 'https://www.bera-it.com/api/v1/licensing/')
 BERA_LICENSE_INSTALLATION_ID = os.environ.get('BERA_LICENSE_INSTALLATION_ID', '')
 BERA_LICENSE_API_CREDENTIAL = os.environ.get('BERA_LICENSE_API_CREDENTIAL', '')
 # Standard base64 encoded raw 32-byte Ed25519 public key.
@@ -147,3 +201,24 @@ BERA_LICENSE_REFRESH_INTERVAL = max(30, int(os.environ.get('BERA_LICENSE_REFRESH
 BERA_LICENSE_GRACE_PERIOD = max(0, int(os.environ.get('BERA_LICENSE_GRACE_PERIOD', '86400')))
 BERA_LICENSE_ENFORCED_MODULES = tuple(filter(None, (v.strip() for v in os.environ.get('BERA_LICENSE_ENFORCED_MODULES', '').split(','))))
 BERA_PLATFORM_VERSION = os.environ.get('BERA_PLATFORM_VERSION', '1.0.0')
+
+BERA_LICENSE_ENCRYPTION_KEY = os.environ.get('BERA_LICENSE_ENCRYPTION_KEY', '')
+
+# Independent owner control; production must be served over HTTPS.
+INSTALLED_APPS += ['bera_control']
+BERA_CONTROL_SHOP_NAME = os.environ.get('BERA_CONTROL_SHOP_NAME', 'BERA Webshop')
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = not DEVELOPMENT
+CSRF_COOKIE_SECURE = not DEVELOPMENT
+
+# Email delivery for stock arrival notifications.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '').lower() in ('1', 'true', 'yes')
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', '').lower() in ('1', 'true', 'yes')
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'webmaster@localhost')

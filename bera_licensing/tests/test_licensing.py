@@ -39,6 +39,25 @@ class LicensingTests(TestCase):
         doc = doc or self.document()
         LicenseState.objects.update_or_create(installation_id='test-install', defaults={'document': doc, 'version': doc['license_version']})
 
+    def test_points_follow_successful_signed_sync(self):
+        from shop.models import Order, LoyaltyEntry
+        from shop.loyalty import settle_points, redeem_points
+        from decimal import Decimal
+        self.install()
+        user = get_user_model().objects.create_user('signed-points')
+        order = Order.objects.create(customer=user, total=100, status='completed')
+        self.assertEqual(LoyaltyEntry.objects.get(order=order).points, 100)
+        self.assertEqual(self.client.get(reverse('loyalty')).status_code, 200)
+        with patch('bera_licensing.services.fetch_license', return_value=self.document(license_version=2, modules={'loyalty': False})):
+            self.assertTrue(sync_license(force=True))
+        self.assertEqual(self.client.get(reverse('loyalty')).status_code, 403)
+        with self.assertRaises(PermissionDenied):
+            settle_points(order.pk)
+        with self.assertRaises(PermissionDenied):
+            redeem_points(order, user, Decimal('100'), 10)
+        Order.objects.create(customer=user, total=100, status='completed')
+        self.assertEqual(LoyaltyEntry.objects.count(), 1)
+
     def test_active_and_disabled(self):
         self.install()
         self.assertTrue(module_enabled('loyalty'))
@@ -130,7 +149,7 @@ class LicensingTests(TestCase):
         self.assertEqual(loyalty_status(user), (0, 0))
         self.assertRedirects(self.client.get(reverse('checkout')), reverse('cart'))
         response = self.client.get(reverse('panel_section', args=['moduli']))
-        self.assertContains(response, 'Zatraži aktivaciju')
+        self.assertContains(response, 'moduleActivationDialog')
         self.client.post(reverse('bera_activation'), {'module': 'loyalty'})
         self.assertEqual(ActivationRequest.objects.count(), 1)
         self.assertFalse(module_enabled('loyalty'))

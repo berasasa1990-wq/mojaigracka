@@ -1,0 +1,13 @@
+{% extends 'wms/base.html' %}
+{% load static panel_tags %}
+{% block title %}Narudžbe | WMS{% endblock %}
+{% block content %}
+{% new_orders_count as pending_orders_count %}
+<div class="wms-heading"><div><p class="eyebrow">WMS / NARUDŽBE</p><h1>Narudžbe</h1><p>Pregled i priprema narudžbi kupaca.</p></div></div>
+{% include 'shop/partials/panel_orders.html' %}
+<dialog id="orderPreviewDialog" class="loyalty-purchases-dialog order-preview-dialog" aria-labelledby="orderPreviewTitle">
+  <form method="dialog" class="loyalty-dialog-close"><button class="home-link" aria-label="Zatvori pregled">Zatvori ×</button></form>
+  <div id="orderPreviewContent" aria-live="polite"><h2 id="orderPreviewTitle">Pregled narudžbe</h2></div>
+</dialog>
+<script src="{% static 'panel-orders.js' %}?v=3" defer></script>
+{% endblock %}

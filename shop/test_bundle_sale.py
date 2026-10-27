@@ -8,6 +8,10 @@ from .cart import priced_items
 
 class BundleSaleTests(TestCase):
     def setUp(self):
+        from bera_control.services import issue_module_code, display_activation_code, redeem_module_code
+        for module in ('article_plus', 'quantity', 'bundle'):
+            activation = issue_module_code(module)
+            redeem_module_code(module, display_activation_code(activation))
         self.first = Product.objects.create(name='Štap', price=100, stock=10, sale_type='bundle', bundle_percent=20)
         self.second = Product.objects.create(name='Mašinica', price=50, stock=10)
         self.third = Product.objects.create(name='Najlon', price=10, stock=10)
@@ -72,7 +76,7 @@ class BundleSaleTests(TestCase):
         self.assertEqual(sum(item.unit_price * item.quantity for item in OrderItem.objects.all()), 128)
 
     def test_product_page_and_sales_show_bundle(self):
-        self.assertContains(self.client.get(self.first.get_absolute_url()), 'Bundle set · −20%')
+        self.assertContains(self.client.get(self.first.get_absolute_url()), 'SET AKCIJA -20%')
         self.assertContains(self.client.get('/akcije/'), 'Štap')
 
     def test_new_set_needs_no_main_product_and_shows_on_every_member(self):
@@ -91,7 +95,7 @@ class BundleSaleTests(TestCase):
         self.assertEqual({stored.pk, *stored.bundle_products.values_list('pk', flat=True)}, {self.first.pk, self.second.pk, self.third.pk})
         for member in [self.first, self.second, self.third]:
             page = self.client.get(member.get_absolute_url())
-            self.assertContains(page, 'Bundle set · −25%')
+            self.assertContains(page, 'SET AKCIJA -25%')
             for name in ['Štap', 'Mašinica', 'Najlon']:
                 self.assertContains(page, name)
 
@@ -106,4 +110,32 @@ class BundleSaleTests(TestCase):
         self.assertEqual(self.first.sale_type, 'regular')
         stored = Product.objects.get(sale_type='bundle')
         self.assertEqual({stored.pk, *stored.bundle_products.values_list('pk', flat=True)}, {self.second.pk, self.third.pk})
-        self.assertNotContains(self.client.get(self.first.get_absolute_url()), 'Bundle set ·')
+        self.assertNotContains(self.client.get(self.first.get_absolute_url()), 'SET AKCIJA -')
+
+    def test_add_bundle_adds_every_member_and_applies_discount(self):
+        response = self.client.post(f'/korpa/set/{self.first.pk}/', HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['count'], 3)
+        self.assertEqual(self.client.get('/korpa/').context['cart_total'], 128)
+        self.client.post(f'/korpa/set/{self.first.pk}/')
+        self.assertEqual(self.client.get('/korpa/').context['cart_total'], 256)
+
+    def test_unavailable_bundle_does_not_add_partial_set(self):
+        self.third.is_out_of_stock = True
+        self.third.save()
+        response = self.client.post(f'/korpa/set/{self.first.pk}/')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.client.session.get('cart', {}), {})
+
+    def test_promotion_groups_match_the_actual_winning_discount(self):
+        self.second.sale_type = 'quantity'
+        self.second.quantity_percent_2 = Decimal('30')
+        self.second.save()
+        items = self.prices([1, 2, 1])
+        first = next(item for item in items if item['product'] == self.first)
+        second = next(item for item in items if item['product'] == self.second)
+        self.assertIn('Bundle set: Štap', first['promotion_groups'][0][2])
+        self.assertIn('Količinsko sniženje', second['promotion_groups'][0][2])
+        self.assertNotIn('Bundle', second['promotion_groups'][0][2])
+        for item in items:
+            self.assertEqual(sum(price * count for price, count, label in item['promotion_groups']), item['subtotal'])

@@ -1,11 +1,12 @@
-{% load static tz %}
+{% load static tz panel_tags %}
+{% new_orders_count as pending_orders_count %}
 <!doctype html>
 <html lang="bs">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% if selected %}{{ selected.title }} | {% endif %}Panel Sajta | BERA</title>
-  <link rel="stylesheet" href="{% static 'css/panel.css' %}?v=6">
+  <link rel="stylesheet" href="{% static 'css/panel.css' %}?v={% panel_css_version %}">
 </head>
 <body>
   <header class="panel-header">
@@ -15,31 +16,63 @@
   <main class="panel-main">
     <div class="panel-intro"><p class="eyebrow">VAŠA TRGOVINA</p><h1>{% if selected %}{{ selected.title }}{% else %}Panel Sajta{% endif %}</h1><p>{% if selected %}{{ selected.description }}{% else %}Sve za vašu ponudu i izgled trgovine na jednom mjestu.{% endif %}</p></div>
     <nav class="panel-settings panel-settings--compact" aria-label="Podešavanje trgovine">
-      {% for item in sections %}{% if item.slug != 'loyalty' or loyalty_enabled %}
-      <a class="panel-card{% if selected.slug == item.slug %} is-active{% endif %}" href="{% url 'panel_section' item.slug %}"{% if selected.slug == item.slug %} aria-current="page"{% endif %}>
-        <span class="panel-card-copy"><h2>{{ item.title }}</h2><span>{{ item.description }}</span></span>
+      {% for item in sections %}
+      {% panel_module_locked item as module_locked %}
+      {% if not module_locked %}
+      <a class="panel-card{% if selected.slug == item.slug %} is-active{% endif %}" href="{% if item.url_name %}{% url item.url_name %}{% else %}{% url 'panel_section' item.slug %}{% endif %}"{% if selected.slug == item.slug %} aria-current="page"{% endif %}>
+        <span class="panel-card-copy"><h2>{{ item.title }}{% if item.slug == 'narudzbe' %} <span class="panel-order-badge" aria-label="{{ pending_orders_count }} novih neposlatih narudžbi">{{ pending_orders_count }}</span>{% endif %}</h2><span>{{ item.description }}</span></span>
       </a>
       {% endif %}{% endfor %}
     </nav>
     {% for message in messages %}<p class="panel-feedback" role="status">{{ message }}</p>{% endfor %}
-    {% if modules_section %}
+    {% if orders_section %}
+    {% include "shop/partials/panel_orders.html" %}
+    {% elif bonus_reward_section %}
+    <section class="panel-content edit-panel">
+      <h2>Bonus nagrada</h2>
+      <p>Ponude se prikazuju nakon narudžbe: najviše 4 na računaru i 2 na telefonu. Kupac može dodati po jedan komad svake ponude u roku od sat vremena, dok je narudžba nova.</p>
+      <form method="post" class="panel-edit-form">{% csrf_token %}
+        {% if bonus_edit %}<input type="hidden" name="offer_id" value="{{ bonus_edit.pk }}">{% endif %}
+        {% for field in bonus_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}{{ bonus_form.non_field_errors }}
+        <div class="form-actions"><button class="home-link save-button">Spremi ponudu</button>{% if bonus_edit %}<a class="home-link" href="{% url 'panel_section' 'bonus-nagrada' %}">Nova ponuda</a>{% endif %}</div>
+      </form>
+      <ul class="panel-list">{% for offer in bonus_offers %}<li><span>{{ offer.product.name }}</span><strong>−{{ offer.percent|floatformat:2 }}% · {{ offer.discounted_price|floatformat:2 }} KM</strong><span>{{ offer.is_active|yesno:'Aktivna,Neaktivna' }}</span><a class="home-link" href="?edit={{ offer.pk }}">Uredi</a><form method="post">{% csrf_token %}<input type="hidden" name="offer_id" value="{{ offer.pk }}"><button class="home-link" name="action" value="delete">Isključi</button></form></li>{% empty %}<li>Dodajte prvi bonus artikal.</li>{% endfor %}</ul>
+    </section>
+    {% elif premium_seo_section %}
+    {% include 'shop/partials/premium_seo_settings.html' %}
+    {% elif modules_section %}
     <section class="panel-content">
-      <h2>Dodatni moduli</h2>
-      <p>Posljednja uspješna provjera: {{ bera_license_state.last_success|date:"d.m.Y. H:i"|default:"Nema provjerene licence" }}</p>
-      <div class="panel-users-scroll"><table class="panel-users">
-        <thead><tr><th>Modul</th><th>Opis</th><th>Status</th><th>Istek</th><th>Aktivacija</th></tr></thead>
-        <tbody>{% for module in bera_modules %}<tr>
-          <td>{{ module.name }}</td><td>{{ module.description }}{% if not module.implemented %} (U pripremi){% endif %}</td>
-          <td>{% if module.enabled %}Aktivan{% else %}Zaključan{% endif %}{% if module.implemented and not module.enforced %} · Postojeći režim{% endif %}</td>
-          <td>{{ module.expires_at|date:"d.m.Y. H:i"|default:"—" }}</td>
-          <td><form method="post" action="{% url 'bera_activation' %}">{% csrf_token %}<input type="hidden" name="module" value="{{ module.code }}"><button class="home-link" type="submit">Zatraži aktivaciju</button></form></td>
-        </tr>{% endfor %}</tbody>
-      </table></div>
-      <p>Zahtjev se evidentira za obradu. Pravo korištenja dodjeljuje isključivo BERA IT potpisanom licencom.</p>
+      <h2>Moduli</h2>
+      <p class="module-intro">Proširite mogućnosti svoje trgovine. Za aktivaciju unesite kod koji ste dobili od BERA podrške.</p>
+      <div class="panel-module-grid">
+        <article class="panel-module-card"><div class="panel-module-top"><span class="panel-module-symbol">%</span><span class="panel-module-status is-active">FREE</span></div><h3>Regularna akcija</h3><p>Standardno sniženje cijene artikla. Uvijek dostupno, bez aktivacije.</p><span class="panel-module-ready">✓ Besplatno uključeno</span></article>
+        {% for module in bera_modules %}
+        <article class="panel-module-card">
+          <div class="panel-module-top"><span class="panel-module-symbol" aria-hidden="true">◇</span><span class="panel-module-status{% if module.enabled %} is-active{% endif %}">{% if not module.implemented %}U pripremi{% elif module.enabled %}AKTIVAN{% else %}NEAKTIVAN{% endif %}</span></div>
+          <h3>{{ module.name }}</h3><p>{{ module.description }}</p>
+          <div class="panel-module-price"><span>Mjesečno korištenje{% if module.monthly_rebate %}<small> · Rabat {{ module.monthly_rebate|floatformat:"-2" }}%</small>{% endif %}</span><div class="panel-module-price-values">{% if module.monthly_rebate and module.base_monthly_price %}<s>{{ module.base_monthly_price|floatformat:2 }} KM/mj</s>{% endif %}<strong>{{ module.monthly_price|floatformat:2 }} <small>KM/mj</small></strong></div></div>
+          {% if module.expired %}<span class="module-expiry-badge" role="status">Licenca je istekla</span>{% elif module.expiry_days %}<span class="module-expiry-badge" role="status">{{ module.expiry_days }} {% if module.expiry_days == 1 %}dan{% else %}dana{% endif %} do isteka licence</span>{% endif %}
+          {% if module.expires_at %}<p class="module-expiry-date">Licenca vrijedi do {{ module.expires_at|date:"d.m.Y. H:i" }}</p>{% endif %}
+          {% if module.implemented %}{% if module.enabled %}<span class="panel-module-ready">✓ Modul je spreman za korištenje</span>{% if module.code == 'premium_seo' %}<a class="home-link" href="{% url 'panel_section' 'premium-seo' %}">Uredi SEO postavke</a>{% endif %}{% if module.code == 'bonus_reward' %}<a class="home-link" href="{% url 'panel_section' 'bonus-nagrada' %}">Uredi bonus artikle i popuste</a>{% endif %}{% else %}<button type="button" class="module-activate-button" data-module-activate="{{ module.code }}" data-module-name="{{ module.name }}">Aktivacija</button>{% endif %}{% else %}<span class="panel-module-ready">Uskoro dostupno</span>{% endif %}
+        </article>
+        {% endfor %}
+      </div>
+      <dialog id="moduleActivationDialog" class="module-activation-dialog" aria-labelledby="moduleActivationTitle">
+        <form method="post" action="{% url 'bera_module_code_activate' %}">
+          {% csrf_token %}<input type="hidden" name="module" id="activationModule">
+          <div class="module-dialog-heading"><span class="eyebrow">BERA MODULI</span><button type="button" class="module-dialog-close" data-activation-close aria-label="Zatvori">×</button></div>
+          <h2 id="moduleActivationTitle">Aktivacija modula</h2><p id="activationModuleName"></p>
+          <label for="moduleActivationCode">Kod za aktivaciju</label>
+          <input id="moduleActivationCode" name="activation_code" maxlength="128" placeholder="BERA-…" required autocomplete="off" spellcheck="false">
+          <p class="module-dialog-hint">Unesite kod koji ste dobili od BERA podrške.</p>
+          <button type="submit" class="module-activate-button">Aktiviraj modul</button>
+        </form>
+      </dialog>
     </section>
     {% elif backup_section %}{% localtime off %}
     <section class="panel-content">
-      <div class="content-heading"><h2>Backup baze podataka</h2><span>{{ backups|length }} kopija</span></div>
+      <div class="content-heading"><h2>Backup baze podataka</h2><span>{{ backups.paginator.count }} kopija</span></div>
+      <p>Čuvaju se kopije iz posljednja 3 dana. Starije kopije automatski se brišu.</p>
       <div class="panel-users-scroll"><table class="panel-users">
         <thead><tr><th>Datum i vrijeme</th><th>Veličina</th><th>Vrsta</th><th>Akcija</th></tr></thead>
         <tbody>{% for backup in backups %}<tr>
@@ -48,19 +81,54 @@
           <td><form method="post" action="{% url 'panel_backup_restore' %}" onsubmit="return confirm('Vratiti bazu na {{ backup.created|date:"d.m.Y. H:i:s" }}? Svi noviji podaci bit će zamijenjeni. Trenutno stanje će biti sačuvano.');">{% csrf_token %}<input type="hidden" name="backup" value="{{ backup.name }}"><button class="home-link" type="submit">Restore</button></form></td>
         </tr>{% empty %}<tr><td colspan="4">Prvi backup će se napraviti automatski nakon pokretanja servera.</td></tr>{% endfor %}</tbody>
       </table></div>
+      {% if backups.has_other_pages %}<nav class="panel-order-filters" aria-label="Stranice backup kopija">
+        {% if backups.has_previous %}<a href="?page={{ backups.previous_page_number }}">Prethodna</a>{% endif %}
+        <span aria-current="page">Stranica {{ backups.number }} od {{ backups.paginator.num_pages }}</span>
+        {% if backups.has_next %}<a href="?page={{ backups.next_page_number }}">Sljedeća</a>{% endif %}
+      </nav>{% endif %}
     </section>
     {% endlocaltime %}{% elif loyalty_formset %}
-    <section class="panel-content edit-panel loyalty-settings"><h2>Loyalty popusti</h2><p class="loyalty-hint">Ukupna potrošnja iz naručenih i završenih narudžbi, bez dostave. Otkazane narudžbe se ne računaju. Od uključuje iznos, do ga ne uključuje. Prazno „do” znači bez gornje granice.</p>
+    <nav class="panel-order-filters loyalty-panel-tabs" aria-label="Loyalty opcije">
+      <a href="{% url 'panel_section' 'loyalty' %}"{% if loyalty_tab == 'search' %} class="is-active" aria-current="page"{% endif %}>Pretraga kartice</a>
+      <a href="?tab=settings"{% if loyalty_tab == 'settings' %} class="is-active" aria-current="page"{% endif %}>Podešavanje loyalty-a</a>
+    </nav>
+    {% if loyalty_tab == 'search' %}
+    <section class="panel-content loyalty-card-search">
+      <form method="get" action="{% url 'panel_section' 'loyalty' %}" role="search">
+        <label for="loyaltyCardSearch">Pretraga kartica kupaca</label>
+        <div class="loyalty-card-search-controls"><input type="search" id="loyaltyCardSearch" name="q" value="{{ card_search }}" maxlength="150" placeholder="Ime kupca, broj kartice ili telefon…"><button type="submit" class="home-link save-button">Pretraži</button>{% if card_search %}<a class="home-link" href="{% url 'panel_section' 'loyalty' %}">Prikaži sve</a>{% endif %}</div>
+      </form>
+    </section>
+    <section class="panel-content"><div class="content-heading"><h2>Kartice kupaca</h2><span>{{ loyalty_cards|length }} kartica</span></div><div class="panel-users-scroll"><table class="panel-users"><thead><tr><th>Kupac</th><th>Kartica</th><th>Datum izdavanja</th><th>Info</th></tr></thead><tbody>{% for card in loyalty_cards %}<tr><td>{% if card.customer.get_full_name %}{{ card.customer.get_full_name }}<br><small>{{ card.customer.email }}</small>{% else %}{{ card.customer.email }}{% endif %}</td><td>{{ card.number }}</td><td>{{ card.created_at|date:"d.m.Y." }}</td><td><button type="button" class="panel-card-info" data-card-purchases="{{ card.pk }}" title="Pregled kupovina" aria-label="Kupovine kartice {{ card.number }}" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v2"/></svg></button></td></tr>{% empty %}<tr><td colspan="4">{% if card_search %}Nema kartica za unesenu pretragu.{% else %}Nema kartica.{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>
+    {% else %}
+    <section class="panel-content loyalty-feature-settings"><h2>Podešavanje loyalty-a</h2>
+      <form method="post">{% csrf_token %}<input type="hidden" name="settings_section" value="features">{{ loyalty_features_form.non_field_errors }}
+        {% for field in loyalty_features_form %}<label class="loyalty-feature-switch"><span><strong>{{ field.label }}</strong><small>{% if field.name == 'tiers_enabled' %}Popusti prema ukupnoj potrošnji kupca.{% else %}Skupljanje i korištenje bodova pri kupovini.{% endif %}</small></span>{{ field }}{{ field.errors }}</label>{% endfor %}
+        <button type="submit" class="home-link save-button">Spremi opcije</button>
+      </form>
+    </section>
+    <section class="panel-content loyalty-settings loyalty-collapsible"><details{% if loyalty_formset.is_bound %} open{% endif %}><summary>Loyalty popusti</summary><div class="loyalty-settings-body"><p class="loyalty-hint">Ukupna potrošnja iz naručenih i završenih narudžbi, bez dostave. Otkazane narudžbe se ne računaju. Od uključuje iznos, do ga ne uključuje. Prazno „do” znači bez gornje granice.</p>
     <form method="post">{% csrf_token %}{{ loyalty_formset.management_form }}{{ loyalty_formset.non_form_errors }}
       <div id="loyaltyRows">{% for tier_form in loyalty_formset %}<div class="loyalty-tier">{{ tier_form.as_p }}</div>{% endfor %}</div>
       <template id="loyaltyEmpty"><div class="loyalty-tier">{{ loyalty_formset.empty_form.as_p }}</div></template>
       <div class="form-actions"><button class="home-link" type="button" id="addLoyaltyTier">Dodaj raspon</button><button class="home-link save-button" type="submit">Spremi loyalty</button></div>
-    </form></section>
-    <section class="panel-content"><div class="content-heading"><h2>Kartice kupaca</h2><span>{{ loyalty_cards|length }} kartica</span></div><div class="panel-users-scroll"><table class="panel-users"><thead><tr><th>Kupac</th><th>Kartica</th><th>Datum izdavanja</th></tr></thead><tbody>{% for card in loyalty_cards %}<tr><td>{{ card.customer.username }}</td><td>{{ card.number }}</td><td>{{ card.created_at|date:"d.m.Y." }}</td></tr>{% empty %}<tr><td colspan="3">Nema kartica.</td></tr>{% endfor %}</tbody></table></div></section>
+    </form></div></details></section>
+    <section class="panel-content loyalty-collapsible"><details{% if loyalty_points_form.is_bound %} open{% endif %}><summary>Bodovi</summary><div class="loyalty-settings-body">
+      <p class="loyalty-hint">Odredite koliko bodova kupac dobija za iznos kupovine i koliko bodova vrijedi određeni popust. Obračun je bez dostave, nakon popusta.</p>
+      <form method="post" class="loyalty-points-settings-form">{% csrf_token %}<input type="hidden" name="settings_section" value="points">{{ loyalty_points_form.non_field_errors }}
+        <fieldset><legend>Dodjela bodova pri kupovini</legend><div class="loyalty-points-pair"><div class="form-field">{{ loyalty_points_form.award_spend.label_tag }}{{ loyalty_points_form.award_spend }}{{ loyalty_points_form.award_spend.errors }}</div><span aria-hidden="true">→</span><div class="form-field">{{ loyalty_points_form.points_per_km.label_tag }}{{ loyalty_points_form.points_per_km }}{{ loyalty_points_form.points_per_km.errors }}</div></div></fieldset>
+        <fieldset><legend>Popust za iskorištene bodove</legend><div class="loyalty-points-pair"><div class="form-field">{{ loyalty_points_form.redemption_points.label_tag }}{{ loyalty_points_form.redemption_points }}{{ loyalty_points_form.redemption_points.errors }}</div><span aria-hidden="true">→</span><div class="form-field">{{ loyalty_points_form.point_value.label_tag }}{{ loyalty_points_form.point_value }}{{ loyalty_points_form.point_value.errors }}</div></div></fieldset>
+        <div class="form-field loyalty-points-limit">{{ loyalty_points_form.max_discount_percent.label_tag }}{{ loyalty_points_form.max_discount_percent }}{{ loyalty_points_form.max_discount_percent.errors }}</div>
+        <p class="loyalty-hint">Bodovi se dodjeljuju kada narudžba bude poslata. Nepuni bodovi zaokružuju se naniže.</p>
+        <button type="submit" class="home-link save-button">Spremi bodove</button>
+      </form>
+    </div></details></section>
+    {% endif %}
     {% elif edit_form %}
     <section class="panel-content edit-panel{% if delivery_settings %} delivery-settings{% endif %}">
       <{% if delivery_settings %}details class="settings-disclosure"{% if edit_form.errors %} open{% endif %}{% else %}div{% endif %}>
       {% if delivery_settings %}<summary>Dostava</summary>{% else %}<h2>{% if editing %}Uredi{% else %}Dodaj{% endif %}: {{ selected.title }}</h2>{% endif %}
+      {% if chatbot_section %}<div class="chatbot-panel-status"><strong>{% if chatbot_guided %}Vođeni odabir artikala — povezan s katalogom{% elif chatbot_connected %}AI povezivanje je podešeno{% else %}AI još nije povezan{% endif %}</strong><p>Chatbot se pojavljuje samo na početnoj, prema vremenu ispod. Vođeni odabir ne zahtijeva API ključ: uredite pitanja, ponuđene budžete i poruke rezultata. Sve kategorije sajta prikazuju se automatski. Za slobodni AI razgovor isključite vođeni odabir i unesite OpenAI API ključ. Povezivanje koristi javni katalog i unesene informacije o trgovini, bez pristupa privatnim narudžbama.</p><p>Ključ ostavite prazan ako ga ne mijenjate. API potrošnju ograničavaju dnevni limit i limit poruka po posjetiocu.</p></div>{% endif %}
       <form method="post" enctype="multipart/form-data" class="panel-edit-form">
         {% csrf_token %}
         {{ edit_form.non_field_errors }}
@@ -103,7 +171,7 @@
     </section>
     {% endif %}
     <section class="panel-content" aria-label="Pregled: {{ selected.title }}">
-      {% if selected.slug == 'banneri' %}{% if hero_editor %}<p><a class="home-link" href="{% url 'panel_edit' 'banneri' hero_editor.pk %}">Uredi glavni banner — tekst i slike</a></p>{% endif %}{% endif %}
+      {% if selected.slug == 'banneri' %}<p>Glavni banner ispod headera: odaberite poziciju <strong>Glavni banner</strong> i učitajte sliku <strong>1600 × 600 px</strong> (AVIF do 80 KB). Slika se prikazuje preko cijele širine, bez rezanja. Veliki banner na početnoj, umjesto najprodavanijih proizvoda: odaberite poziciju <strong>Veliki banner — ispod ponuda</strong> i učitajte sliku preporučene dimenzije <strong>1600 × 600 px</strong>.</p>{% endif %}
       <div class="content-heading"><h2>Pregled</h2>{% if can_add %}<a class="home-link" href="{% url 'panel_add' selected.slug %}">Dodaj</a>{% endif %}<span>{{ rows|length }} stavki</span></div>
       {% if selected.slug == 'korisnici' %}
       <div class="panel-users-scroll"><table class="panel-users"><thead><tr><th>Korisničko ime</th><th>Ime i prezime</th><th>E-mail</th><th>Registracija</th><th>Status</th><th>Uloga</th></tr></thead><tbody>
@@ -206,6 +274,104 @@ if (featuredSearch) {
     if (event.key === 'Enter') event.preventDefault();
   });
 }
+const activationDialog = document.querySelector('#moduleActivationDialog');
+if (activationDialog) {
+  document.querySelectorAll('[data-module-activate]').forEach(button => {
+    button.addEventListener('click', () => {
+      document.querySelector('#activationModule').value = button.dataset.moduleActivate;
+      document.querySelector('#activationModuleName').textContent = button.dataset.moduleName;
+      document.querySelector('#moduleActivationCode').value = '';
+      activationDialog.showModal();
+      document.querySelector('#moduleActivationCode').focus();
+    });
+  });
+  const activationForm = activationDialog.querySelector('form');
+  const activationSubmit = activationForm.querySelector('button[type="submit"]');
+  let activationPending = false;
+  activationForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activationPending) return;
+    activationPending = true;
+    activationSubmit.disabled = true;
+    let status = activationForm.querySelector('[data-activation-status]');
+    if (!status) {
+      status = document.createElement('p');
+      status.dataset.activationStatus = '';
+      status.setAttribute('role', 'status');
+      activationSubmit.before(status);
+    }
+    status.textContent = 'Aktivacija…';
+    try {
+      const response = await fetch("{% url 'customer_csrf_token' %}", {credentials: 'same-origin', cache: 'no-store'});
+      if (!response.ok || response.redirected) throw new Error('Token unavailable');
+      const data = await response.json();
+      if (!data.csrfToken) throw new Error('Token missing');
+      activationForm.querySelector('[name="csrfmiddlewaretoken"]').value = data.csrfToken;
+      HTMLFormElement.prototype.submit.call(activationForm);
+    } catch {
+      status.textContent = 'Aktivacija nije poslana. Pokušajte ponovo ili osvježite stranicu.';
+      activationPending = false;
+      activationSubmit.disabled = false;
+    }
+  });
+  activationDialog.querySelector('[data-activation-close]').addEventListener('click', () => activationDialog.close());
+}
+const seoTitle = document.querySelector('#id_home_title');
+if (seoTitle) {
+  const seoName = document.querySelector('#id_site_name');
+  const seoDescription = document.querySelector('#id_description');
+  const seoDomain = document.querySelector('#id_canonical_domain');
+  const updateSeoPreview = () => {
+    document.querySelector('#seoPreviewTitle').textContent = seoTitle.value || `${seoName.value || 'BERA'} | Online trgovina`;
+    document.querySelector('#seoPreviewDescription').textContent = seoDescription.value || 'Ovdje će se prikazati opis vaše trgovine.';
+    document.querySelector('#seoPreviewDomain').textContent = seoDomain.value || window.location.origin;
+  };
+  [seoTitle, seoName, seoDescription, seoDomain].forEach(field => field.addEventListener('input', updateSeoPreview));
+  [seoTitle, seoDescription].forEach(field => {
+    const counter = document.createElement('small');
+    const update = () => { counter.textContent = `${field.value.length} / ${field.maxLength} znakova`; };
+    field.after(counter);
+    field.addEventListener('input', update);
+    update();
+  });
+  updateSeoPreview();
+}
 </script>
+{% if loyalty_formset %}
+<dialog id="loyaltyPurchasesDialog" class="loyalty-purchases-dialog" aria-labelledby="loyaltyPurchasesTitle">
+  <form method="dialog" class="loyalty-dialog-close"><button class="home-link" aria-label="Zatvori pregled kupovina">Zatvori ×</button></form>
+  <div id="loyaltyPurchasesContent" aria-live="polite"><h2 id="loyaltyPurchasesTitle">Kupovine kartice</h2></div>
+</dialog>
+<script>
+const purchasesDialog = document.querySelector('#loyaltyPurchasesDialog');
+const purchasesContent = document.querySelector('#loyaltyPurchasesContent');
+let purchasesRequest;
+document.querySelectorAll('[data-card-purchases]').forEach(button => {
+  button.addEventListener('click', async () => {
+    if (purchasesRequest) purchasesRequest.abort();
+    purchasesRequest = new AbortController();
+    purchasesContent.innerHTML = '<h2 id="loyaltyPurchasesTitle">Kupovine kartice</h2><p>Učitavanje…</p>';
+    purchasesDialog.showModal();
+    const url = new URL(window.location.href);
+    url.searchParams.set('card', button.dataset.cardPurchases);
+    try {
+      const response = await fetch(url, { signal: purchasesRequest.signal });
+      if (!response.ok || response.redirected) throw new Error('Nije moguće učitati kupovine.');
+      purchasesContent.innerHTML = await response.text();
+    } catch (error) {
+      if (error.name !== 'AbortError') purchasesContent.innerHTML = '<h2 id="loyaltyPurchasesTitle">Kupovine kartice</h2><p>Nije moguće učitati kupovine. Pokušajte ponovo.</p>';
+    }
+  });
+});
+purchasesDialog.addEventListener('close', () => { if (purchasesRequest) purchasesRequest.abort(); });
+</script>
+{% endif %}
+{% if orders_section %}
+<dialog id="orderPreviewDialog" class="loyalty-purchases-dialog order-preview-dialog" aria-labelledby="orderPreviewTitle">
+  <form method="dialog" class="loyalty-dialog-close"><button class="home-link" aria-label="Zatvori pregled">Zatvori ×</button></form>
+  <div id="orderPreviewContent" aria-live="polite"><h2 id="orderPreviewTitle">Pregled narudžbe</h2></div>
+</dialog>
+<script src="{% static 'panel-orders.js' %}?v=2" defer></script>
+{% endif %}
 </body>
 </html>

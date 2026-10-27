@@ -20,14 +20,27 @@ class HeroBannerTests(TestCase):
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
                 self.assertTrue(image.name.endswith('.avif'))
-                self.assertLessEqual(image.size, 15000)
+                self.assertLessEqual(image.size, 80_000)
             response = self.client.get(reverse('home'))
-            for text in ('Nova ponuda', 'Noviteti', 'Opis ponude', 'Pogledaj artikle', banner.image.url, banner.secondary_image.url):
+            for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
                 self.assertContains(response, text)
             self.assertNotContains(response, 'Vaš svijet.')
             banner.is_active = False
             banner.save()
             self.assertNotContains(self.client.get(reverse('home')), 'bera-hero-inner')
+
+    def test_banner_keeps_resolution_and_uses_80kb_budget(self):
+        from PIL import Image
+        artwork = Image.effect_noise((800, 300), 40).convert('RGB')
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            form = BannerForm({'position': 'middle', 'title': 'Veliki banner', 'is_active': 'on'}, {'image': upload(artwork)})
+            self.assertTrue(form.is_valid(), form.errors)
+            banner = form.save()
+            self.assertLessEqual(banner.image.size, 80_000)
+            self.assertGreater(banner.image.size, 15_000)
+            with Image.open(banner.image) as image:
+                self.assertEqual(image.size, artwork.size)
+            self.assertContains(self.client.get(reverse('home')), banner.image.url)
 
     def test_text_only_hero(self):
         form = BannerForm({'position': 'hero', 'title': 'Tekst bez slike', 'is_active': 'on'}, instance=Banner.objects.get(position='hero'))

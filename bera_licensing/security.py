@@ -25,7 +25,9 @@ def verify_document(document, *, accepting=False, now=None):
             raise ValueError()
         key = Ed25519PublicKey.from_public_bytes(base64.b64decode(settings.BERA_LICENSE_PUBLIC_KEY, validate=True))
         key.verify(base64.b64decode(document['signature'], validate=True), canonical_payload(document))
-        if not settings.BERA_LICENSE_INSTALLATION_ID or document['installation_id'] != settings.BERA_LICENSE_INSTALLATION_ID:
+        from .credentials import installation_id
+        installation = installation_id()
+        if not installation or document['installation_id'] != installation:
             raise ValueError()
         if type(document['protocol_version']) is not int or document['protocol_version'] != 1:
             raise ValueError()

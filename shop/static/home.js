@@ -71,7 +71,8 @@ if (wishlistPage) {
   }
 }
 document.querySelectorAll('[data-wishlist-open]').forEach(button => {
-  button.addEventListener('click', () => {
+  button.addEventListener('click', event => {
+    event.preventDefault();
     const url = new URL(button.dataset.wishlistOpen, window.location.origin);
     url.searchParams.set('ids', [...wishlist].slice(0, 500).join(','));
     window.location.href = url;
@@ -275,7 +276,7 @@ document.addEventListener('click', async event => {
       document.querySelector('#articlePlusOffer')?.close();
       if (data.offer) showArticlePlusOffer(data.offer);
       if (button.dataset.refreshCart === 'true') { window.location.reload(); return; }
-      toast.textContent = 'Artikal je dodan u korpu.';
+      toast.textContent = data.message || 'Artikal je dodan u korpu.';
       toast.hidden = false;
       clearTimeout(cartToastTimer);
       cartToastTimer = setTimeout(() => { toast.hidden = true; }, 2500);
@@ -396,4 +397,109 @@ document.addEventListener('click', event => {
 document.addEventListener('click', event => {
   const close = event.target.closest('[data-close-quantity-offer]');
   if (close) close.closest('.cart-quantity-offers')?.remove();
+});
+
+// Preview the linked Ponuda + product without leaving the current product page.
+document.addEventListener('click', event => {
+  if (event.target.closest('[data-plus-preview-open]')) {
+    document.querySelector('#productPlusPreview')?.showModal();
+  }
+  if (event.target.closest('[data-plus-preview-close]')) {
+    document.querySelector('#productPlusPreview')?.close();
+  }
+});
+
+const brandsDialog = document.querySelector('#brandsDialog');
+document.querySelectorAll('[data-brands-open]').forEach(button => {
+  button.addEventListener('click', () => brandsDialog?.showModal());
+});
+brandsDialog?.addEventListener('click', event => {
+  if (event.target !== brandsDialog) return;
+  const bounds = brandsDialog.getBoundingClientRect();
+  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) brandsDialog.close();
+});
+
+// One shared clock for all visible promotion countdowns.
+const saleCountdowns = [...document.querySelectorAll('[data-sale-countdown]')];
+function updateSaleCountdowns() {
+  let expired = false;
+  const now = Date.now();
+  saleCountdowns.forEach(timer => {
+    const end = Date.parse(timer.dataset.saleCountdown);
+    if (!Number.isFinite(end)) { timer.hidden = true; return; }
+    const seconds = Math.max(0, Math.ceil((end - now) / 1000));
+    if (!seconds) {
+      timer.querySelector('[data-countdown-value]').textContent = 'Istekla';
+      expired = true;
+      return;
+    }
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor(seconds % 86400 / 3600);
+    const minutes = Math.floor(seconds % 3600 / 60);
+    const pad = value => String(value).padStart(2, '0');
+    timer.querySelector('[data-countdown-value]').textContent = `${days ? days + 'd ' : ''}${pad(hours)}:${pad(minutes)}:${pad(seconds % 60)}`;
+  });
+  if (expired) { clearInterval(saleCountdownInterval); window.location.reload(); }
+}
+let saleCountdownInterval;
+if (saleCountdowns.length) {
+  saleCountdownInterval = setInterval(updateSaleCountdowns, 1000);
+  updateSaleCountdowns();
+}
+
+const productZoomDialog = document.querySelector('#productZoomDialog');
+document.querySelector('[data-product-zoom]')?.addEventListener('click', () => productZoomDialog?.showModal());
+productZoomDialog?.addEventListener('click', event => {
+  if (event.target !== productZoomDialog) return;
+  const bounds = productZoomDialog.getBoundingClientRect();
+  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) productZoomDialog.close();
+});
+
+// Subscribe to a product's next arrival without leaving the current page.
+document.addEventListener('submit', async event => {
+  const form = event.target.closest('.stock-notification-form');
+  if (!form) return;
+  event.preventDefault();
+  const button = form.querySelector('button[type="submit"]');
+  const status = form.querySelector('[role="status"]');
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = 'Spremanje prijave…';
+  try {
+    const response = await fetch(form.action, {method: 'POST', body: new FormData(form), credentials: 'same-origin'});
+    const data = await response.json();
+    status.textContent = data.message;
+    if (response.ok) {
+      status.textContent = '';
+      status.hidden = true;
+      button.textContent = 'Obavijest prijavljena';
+      const details = form.querySelector('details');
+      if (details) details.open = false;
+    } else button.disabled = false;
+  } catch {
+    status.textContent = 'Prijava nije uspjela. Pokušajte ponovo.';
+    button.disabled = false;
+  }
+});
+
+const productShareButton = document.querySelector('[data-product-share]');
+productShareButton?.addEventListener('click', async () => {
+  const url = new URL(productShareButton.dataset.sharePath, window.location.origin).href;
+  const status = document.querySelector('.product-share-status');
+  status.hidden = true;
+  if (navigator.share) {
+    try {
+      await navigator.share({title: productShareButton.dataset.shareTitle, url});
+      return;
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    status.textContent = 'Link artikla je kopiran.';
+    status.hidden = false;
+  } catch {
+    window.prompt('Kopirajte link artikla:', url);
+  }
 });

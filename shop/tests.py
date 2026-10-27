@@ -1,3 +1,4 @@
+from unittest.mock import patch, PropertyMock
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -219,7 +220,7 @@ class CartTests(TestCase):
         self.assertContains(self.client.get(reverse('cart')), 'Vaša korpa je prazna')
 
     def test_invalid_stock_and_unavailable_product(self):
-        for quantity in ['bad', -1, 4]:
+        for quantity in ['bad', -1, 100]:
             self.assertEqual(self.client.post(self.url, {'quantity': quantity}).status_code, 400)
         self.product.is_out_of_stock = True
         self.product.save()
@@ -235,7 +236,8 @@ class CartTests(TestCase):
         self.assertEqual(response.json()['count'], 1)
         self.assertContains(client.get(reverse('home')), 'data-cart-count')
 
-    def test_changed_availability_is_reflected(self):
+    @patch('shop.models.Product.wms_enabled', new_callable=PropertyMock, return_value=True)
+    def test_changed_availability_is_reflected(self, wms):
         self.client.post(self.url, {'quantity': 3})
         self.product.stock = 1
         self.product.save()
@@ -245,6 +247,7 @@ class CartTests(TestCase):
         self.assertEqual(self.client.get(reverse('cart')).context['cart_count'], 0)
 
 
+@patch('shop.models.Product.wms_enabled', new_callable=PropertyMock, return_value=True)
 class CheckoutTests(TestCase):
     def setUp(self):
         self.product = Product.objects.create(name='Checkout artikal', price='20.00', stock=2)
@@ -253,17 +256,17 @@ class CheckoutTests(TestCase):
     def add(self):
         self.client.post(reverse('cart_update', args=[self.product.pk]), {'quantity': 2})
 
-    def test_empty_checkout_redirects_to_cart(self):
+    def test_empty_checkout_redirects_to_cart(self, wms):
         self.assertRedirects(self.client.get(reverse('checkout')), reverse('cart'))
 
-    def test_cart_links_to_checkout_and_requires_delivery_details(self):
+    def test_cart_links_to_checkout_and_requires_delivery_details(self, wms):
         self.add()
         self.assertContains(self.client.get(reverse('cart')), 'href="/checkout/"')
         response = self.client.post(reverse('checkout'), {})
         self.assertTrue(response.context['form'].errors)
         self.assertEqual(self.product.order_items.count(), 0)
 
-    def test_confirm_order_snapshots_prices_and_clears_cart(self):
+    def test_confirm_order_snapshots_prices_and_clears_cart(self, wms):
         self.add()
         response = self.client.post(reverse('checkout'), self.data)
         self.assertRedirects(response, '/checkout/?success=1')
@@ -275,11 +278,11 @@ class CheckoutTests(TestCase):
         self.assertEqual(self.client.session['cart'], {})
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 0)
-        self.assertTrue(self.product.is_out_of_stock)
+        self.assertFalse(self.product.is_out_of_stock)
         self.client.post(reverse('checkout'), self.data)
         self.assertEqual(self.product.order_items.count(), 1)
 
-    def test_reject_changed_stock(self):
+    def test_reject_changed_stock(self, wms):
         self.add()
         self.product.stock = 1
         self.product.save()
@@ -392,20 +395,20 @@ class CustomerAccountTests(TestCase):
     def test_registration_profile_and_logout(self):
         self.assertRedirects(self.client.get(reverse('account')), '/nalog/prijava/?next=/nalog/')
         response = self.client.post(reverse('customer_register'), {
-            'username': 'kupac', 'email': 'kupac@example.com', 'first_name': 'Test',
+            'username': 'kupac', 'phone': '061123456', 'email': 'kupac@example.com', 'first_name': 'Test',
             'last_name': 'Kupac', 'password1': 'Kupac-Strong-582!', 'password2': 'Kupac-Strong-582!',
         })
         self.assertRedirects(response, reverse('account'))
-        user = get_user_model().objects.get(username='kupac')
+        user = get_user_model().objects.get(email='kupac@example.com')
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.client.post(reverse('account'), {'first_name': 'Novo', 'last_name': 'Ime', 'email': 'novo@example.com', 'is_staff': 'true'})
+        self.client.post(reverse('account'), {'phone': '061123456', 'first_name': 'Novo', 'last_name': 'Ime', 'email': 'novo@example.com', 'is_staff': 'true'})
         user.refresh_from_db()
         self.assertEqual(user.first_name, 'Novo')
         self.assertFalse(user.is_staff)
         self.assertEqual(self.client.get(reverse('customer_logout')).status_code, 405)
         self.assertRedirects(self.client.post(reverse('customer_logout')), reverse('customer_login'))
-        self.assertRedirects(self.client.post(reverse('customer_login'), {'username': 'kupac', 'password': 'Kupac-Strong-582!'}), reverse('account'))
+        self.assertRedirects(self.client.post(reverse('customer_login'), {'username': 'novo@example.com', 'password': 'Kupac-Strong-582!'}), reverse('account'))
 
     def test_login_rejects_wrong_password_and_post_requires_csrf(self):
         from django.test import Client
@@ -522,8 +525,8 @@ class LoyaltyTests(TestCase):
         self.assertFalse(LoyaltyTier.objects.exists())
         manager = get_user_model().objects.create_user('loyalty-manager', is_staff=True)
         self.client.force_login(manager)
-        self.assertContains(self.client.get(url), 'Loyalty popusti')
-        self.assertRedirects(self.client.post(url, data), url)
+        self.assertContains(self.client.get(url, {'tab': 'settings'}), 'Loyalty popusti')
+        self.assertRedirects(self.client.post(url, data), url + '?tab=settings')
         self.assertEqual(LoyaltyTier.objects.count(), 2)
         data['form-0-percent'] = '101'
         self.assertFalse(LoyaltySettingsFormSet(data).is_valid())

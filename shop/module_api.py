@@ -14,7 +14,8 @@ from .models import SiteModule
 @csrf_exempt
 @require_POST
 def update_loyalty_module(request):
-    if 'loyalty' in settings.BERA_LICENSE_ENFORCED_MODULES:
+    from bera_licensing.credentials import centrally_managed
+    if 'loyalty' in settings.BERA_LICENSE_ENFORCED_MODULES or centrally_managed():
         return JsonResponse({'error': 'Legacy module control disabled'}, status=410)
     key = settings.MODULE_CONTROL_KEY
     token = request.POST.get('token', '')

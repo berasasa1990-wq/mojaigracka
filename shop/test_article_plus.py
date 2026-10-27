@@ -7,6 +7,10 @@ from .cart import priced_items
 
 class ArticlePlusTests(TestCase):
     def setUp(self):
+        from bera_control.services import issue_module_code, display_activation_code, redeem_module_code
+        for module in ('article_plus', 'quantity', 'bundle'):
+            activation = issue_module_code(module)
+            redeem_module_code(module, display_activation_code(activation))
         self.second = Product.objects.create(name='Drugi', price=20)
         self.first = Product.objects.create(name='Prvi', price=50, sale_type='article_plus', plus_product=self.second, plus_percent=25)
 

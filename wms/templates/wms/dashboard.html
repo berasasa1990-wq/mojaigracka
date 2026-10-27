@@ -1,0 +1,24 @@
+{% extends 'wms/base.html' %}
+{% block content %}
+<div class="wms-heading"><div><p class="eyebrow">WMS / ARTIKLI</p><h1>Artikli i zalihe</h1><p>Količine i lokacije artikala na jednom mjestu.</p></div></div>
+<div class="wms-stats">
+  <section><span>Ukupno artikala</span><strong>{{ product_count }}</strong></section>
+  <section><span>Komada na stanju</span><strong>{{ stock_total }}</strong></section>
+  <section><span>Bez dostupnih zaliha</span><strong>{{ unavailable_count }}</strong></section>
+</div>
+<section class="panel-content">
+  <div class="content-heading"><h2>Pregled artikala</h2><form class="wms-search" method="get"><label class="wms-sr-only" for="search">Pretraga po nazivu ili lokaciji</label><input type="search" id="search" name="q" value="{{ query }}" placeholder="Naziv artikla ili lokacija…"><button class="home-link" type="submit">Pretraži</button>{% if query %}<a class="home-link" href="{% url 'wms:dashboard' %}">Poništi</a>{% endif %}</form></div>
+  <div class="wms-table-scroll"><table class="wms-table wms-mobile-cards">
+    <thead><tr><th>Artikal</th><th>Kategorija / brend</th><th>Količina na stanju</th><th>Dostupno za prodaju</th><th>Lokacija</th><th></th></tr></thead>
+    <tbody>{% for product in page_obj %}<tr>
+      <td data-label="Artikal"><div class="wms-cell-value"><div class="wms-product">{% if product.image %}<img src="{{ product.image.url }}" alt="" width="44" height="44" loading="lazy">{% endif %}<div><strong>{{ product.name }}</strong><small>#{{ product.pk }}</small></div></div></div></td>
+      <td data-label="Kategorija / brend"><div class="wms-cell-value">{{ product.category|default:'—' }}<small>{{ product.brand|default:'—' }}</small></div></td>
+      <td data-label="Na stanju"><div class="wms-cell-value"><strong>{{ product.stock }}</strong> kom.</div></td>
+      <td data-label="Za prodaju"><div class="wms-cell-value">{% if not product.is_available or not product.is_active %}<span class="wms-badge is-muted">0 kom.</span>{% else %}<span class="wms-badge">{{ product.stock }} kom.</span>{% endif %}</div></td>
+      <td data-label="Lokacija"><div class="wms-cell-value">{{ product.warehouse_location.location|default:'Nije dodijeljena' }}</div></td>
+      <td data-label=""><div class="wms-cell-value"><a class="wms-text-link" href="{% url 'wms:product_location' product.pk %}">Uredi lokaciju</a></div></td>
+    </tr>{% empty %}<tr><td colspan="6" class="wms-empty">Nema artikala za prikaz. Promijenite pretragu ili dodajte artikal u kontrolnom panelu.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if page_obj.has_other_pages %}<nav class="wms-pagination" aria-label="Stranice artikala">{% if page_obj.has_previous %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Prethodna</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.next_page_number }}">Sljedeća</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}

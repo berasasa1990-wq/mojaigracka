@@ -1,0 +1,16 @@
+{% extends 'wms/base.html' %}
+{% block content %}
+<div class="wms-heading"><div><p class="eyebrow">WMS / ISTORIJA</p><h1>Istorija</h1><p>Dodavanje i skidanje zaliha od početka vođenja evidencije.</p></div></div>
+<section class="panel-content">
+  <div class="content-heading"><h2>Promjene stanja</h2><form class="wms-search" method="get"><label class="wms-sr-only" for="search">Artikal ili razlog</label><input type="search" id="search" name="q" value="{{ query }}" placeholder="Artikal ili razlog…"><button class="home-link" type="submit">Pretraži</button></form></div>
+  <div class="wms-table-scroll"><table class="wms-table wms-mobile-cards">
+    <thead><tr><th>Datum i vrijeme</th><th>Artikal</th><th>Promjena</th><th>Stanje prije → poslije</th><th>Razlog</th></tr></thead>
+    <tbody>{% for movement in page_obj %}<tr>
+      <td data-label="Datum i vrijeme"><div class="wms-cell-value">{{ movement.created_at|date:'d.m.Y. H:i' }}</div></td><td data-label="Artikal"><div class="wms-cell-value">{{ movement.product_name }}</div></td>
+      <td data-label="Promjena"><div class="wms-cell-value">{% if movement.change > 0 %}<strong class="wms-stock-added"><span aria-hidden="true">↑</span> +{{ movement.change }} kom.</strong><span class="wms-sr-only">Dodato na stanje</span>{% else %}<strong class="wms-stock-removed"><span aria-hidden="true">↓</span> {{ movement.change }} kom.</strong><span class="wms-sr-only">Skinuto sa stanja</span>{% endif %}</div></td>
+      <td data-label="Stanje prije → poslije"><div class="wms-cell-value">{{ movement.stock_before }} → {{ movement.stock_after }}</div></td><td data-label="Razlog"><div class="wms-cell-value">{{ movement.reason }}</div></td>
+    </tr>{% empty %}<tr><td colspan="5" class="wms-empty">Nema evidentiranih promjena stanja.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if page_obj.has_other_pages %}<nav class="wms-pagination" aria-label="Stranice istorije">{% if page_obj.has_previous %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Prethodna</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="home-link" href="?q={{ query|urlencode }}&amp;page={{ page_obj.next_page_number }}">Sljedeća</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}
