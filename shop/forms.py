@@ -47,7 +47,17 @@ class BannerForm(forms.ModelForm):
         model = Banner
         fields = ['position', 'title', 'eyebrow', 'subtitle', 'button_text', 'features', 'image', 'secondary_image', 'url', 'is_active']
         widgets = {'title': forms.Textarea(attrs={'rows': 2})}
-        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1600 × 600 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Automatsko spremanje u AVIF do 80 KB uz očuvanje što boljeg kvaliteta.'}
+        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1600 × 600 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Glavni banner: do 1920 px i 1 MB, PNG/WebP visokog kvaliteta. Ostali banneri: do 80 KB.'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        position = self.data.get(self.add_prefix('position')) if self.is_bound else self.instance.position
+        if position == 'hero':
+            from .image_uploads import HERO_IMAGE_OPTIONS
+            for name in ('image', 'secondary_image'):
+                for option, value in HERO_IMAGE_OPTIONS.items():
+                    setattr(self.fields[name], option, value)
+                self.fields[name].help_text = 'Glavni banner: preporučeno 1920 × 720 px, do 1 MB; PNG ili WebP visokog kvaliteta, uz očuvanu transparentnost.'
 
     def clean(self):
         data = super().clean()

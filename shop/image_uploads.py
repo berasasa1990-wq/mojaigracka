@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_FALLBACK_ATTEMPTS = 8
+HERO_IMAGE_OPTIONS = {
+    "max_bytes": 1_000_000, "max_side": 1920, "prefer_webp": True, "quality": 90,
+}
 FORMAT_DETAILS = {'AVIF': ('.avif', 'image/avif'), 'WEBP': ('.webp', 'image/webp'),
                   'PNG': ('.png', 'image/png')}
 
@@ -30,10 +33,10 @@ def _encode(image, format, **options):
     return output.getvalue()
 
 
-def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False):
+def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None):
     """Bound encoder work: at most one fast AVIF, then bounded WebP/PNG fallback."""
     max_side = max_side or (1280 if max_bytes > MAX_IMAGE_BYTES else 960)
-    policy = (max_bytes, max_side, prefer_webp)
+    policy = (max_bytes, max_side, prefer_webp, quality)
     if getattr(upload, '_optimized_image', None) == policy and upload.size <= max_bytes:
         return upload
     started = time.monotonic()
@@ -77,7 +80,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
         if not prefer_webp and image.mode == 'RGB' and max(image.size) > 512 and features.check('avif'):
             attempts += 1
             try:
-                data = _encode(image, 'AVIF', quality=55, speed=10, max_threads=1)
+                data = _encode(image, 'AVIF', quality=quality or 55, speed=10, max_threads=1)
                 if len(data) <= max_bytes:
                     return finish(data, 'AVIF')
             except (OSError, ValueError, RuntimeError):
@@ -90,7 +93,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             attempts += 1
             try:
                 if fallback_format == 'WEBP':
-                    data = _encode(image, 'WEBP', quality=max(35, 85 - attempt * 10),
+                    data = _encode(image, 'WEBP', quality=max(35, (quality or 85) - attempt * 10),
                                    method=0, alpha_quality=100, exact=True)
                 else:
                     data = _encode(image, 'PNG', compress_level=3)
@@ -116,17 +119,18 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
 
 
 class AVIFUploadFormField(forms.FileField):
-    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, **kwargs):
+    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, quality=None, **kwargs):
         self.max_bytes = max_bytes
         self.max_side = max_side
         self.prefer_webp = prefer_webp
+        self.quality = quality
         super().__init__(*args, **kwargs)
         self.widget.attrs['accept'] = 'image/png,image/jpeg,image/webp,image/gif,image/avif'
 
     def clean(self, data, initial=None):
         value = super().clean(data, initial)
         if value and value is not initial:
-            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp)
+            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp, quality=self.quality)
         return value
 
 
@@ -150,13 +154,17 @@ class AVIFFileField(models.FileField):
             **kwargs,
         })
 
-    def optimization_options(self):
+    def optimization_options(self, instance=None):
+        if (instance is not None and instance._meta.label_lower == 'shop.banner'
+                and instance.position == 'hero'):
+            return dict(HERO_IMAGE_OPTIONS)
         return {'prefer_webp': self.name == 'logo',
                 'max_side': 512 if self.name == 'logo' else (1280 if self.max_bytes > MAX_IMAGE_BYTES else 960)}
 
     def pre_save(self, model_instance, add):
         file = getattr(model_instance, self.attname)
         if file and not file._committed:
-            converted = optimize_image(file.file, self.max_bytes, **self.optimization_options())
+            options = {'max_bytes': self.max_bytes, **self.optimization_options(model_instance)}
+            converted = optimize_image(file.file, **options)
             setattr(model_instance, self.attname, converted)
         return super().pre_save(model_instance, add)

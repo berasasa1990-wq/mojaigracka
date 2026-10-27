@@ -20,7 +20,7 @@ class HeroBannerTests(TestCase):
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
                 self.assertTrue(image.name.endswith(('.avif', '.webp', '.png')))
-                self.assertLessEqual(image.size, 80_000)
+                self.assertLessEqual(image.size, 1_000_000)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
                 self.assertContains(response, text)
@@ -103,3 +103,34 @@ class HeroBannerTests(TestCase):
         self.assertContains(response, f'id="customHeroTitle{original.pk}"')
         self.assertContains(response, f'id="customHeroTitle{new_banner.pk}"')
         self.assertEqual(Banner.objects.filter(position='hero').count(), 2)
+
+
+    def test_hero_preserves_large_artwork_and_encodes_once(self):
+        from PIL import Image
+        from unittest.mock import patch
+        from . import image_uploads
+
+        artwork = Image.effect_noise((1920, 720), 40).convert('RGB')
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media), patch(
+                'shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
+            form = BannerForm({'position': 'hero', 'title': 'HD banner', 'is_active': 'on'},
+                              {'image': upload(artwork)})
+            self.assertTrue(form.is_valid(), form.errors)
+            attempts = encode.call_count
+            banner = form.save()
+            self.assertEqual(encode.call_count, attempts)
+            self.assertFalse(any(call.args[1] == 'AVIF' for call in encode.call_args_list))
+            self.assertLessEqual(banner.image.size, 1_000_000)
+            self.assertGreater(banner.image.size, 80_000)
+            with banner.image.open('rb') as file, Image.open(file) as image:
+                self.assertEqual(image.size, (1920, 720))
+
+    def test_direct_hero_upload_uses_high_quality_policy(self):
+        from PIL import Image
+
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            banner = Banner.objects.create(position='hero', title='Direct',
+                                           image=upload(Image.new('RGBA', (1920, 720), (20, 50, 80, 120))))
+            with banner.image.open('rb') as file, Image.open(file) as image:
+                self.assertEqual(image.size, (1920, 720))
+                self.assertEqual(image.getpixel((0, 0))[3], 120)

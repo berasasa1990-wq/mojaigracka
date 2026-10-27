@@ -50,3 +50,12 @@ produkcijska migracija ili prerada postojećih slika.
 
 Pillow opcije:
 https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
+
+## Glavni banner — viši kvalitet
+
+Glavni banner (position=hero), obje slike: do 1920 px i 1.000.000 bajtova,
+prvo PNG bez gubitaka ako stane, inače WebP quality=90/method=0. AVIF se ne
+pokreće. Profil važi za BannerForm i direktno spremanje modela; rezultat forme
+ne obrađuje se ponovo. Ostali banneri ostaju na 80 KB / 1280 px.
+Postojeće slike se ne prepravljaju: ponovo uploadovati ORIGINAL glavnog bannera
+da bi se vidjelo poboljšanje. Nema nove migracije, promjene HTML/CSS ili timeouta.
