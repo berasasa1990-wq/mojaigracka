@@ -180,6 +180,17 @@ STORAGES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', str(BASE_DIR / 'media')))
 
+# Public artwork only. Keep default/private files and WhiteNoise independent.
+from shop.storage import r2_configuration
+_r2_storage, R2_IMAGES_ENABLED = r2_configuration(os.environ)
+if _r2_storage:
+    STORAGES['r2_images'] = _r2_storage
+STORAGES['public_images'] = (
+    _r2_storage if R2_IMAGES_ENABLED
+    else {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
+)
+
+
 
 # Shared server-only key for short-lived admin SSO tokens.
 _admin_sso_key_file = BASE_DIR / '.secrets' / 'admin_sso_key'

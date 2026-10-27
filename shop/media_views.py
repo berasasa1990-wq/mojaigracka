@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from django.conf import settings
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.utils.http import content_disposition_header
 from django.utils.html import strip_tags
 from django.utils.text import slugify
@@ -26,6 +26,12 @@ def image_download_name(path):
 def public_image(request, path, **kwargs):
     if Path(path).suffix.lower() not in IMAGE_EXTENSIONS:
         raise Http404('Slika nije pronađena.')
+    if getattr(settings, 'R2_IMAGES_ENABLED', False):
+        from .storage import PUBLIC_PREFIXES, public_image_storage
+        if not path.startswith(PUBLIC_PREFIXES) or '..' in Path(path).parts or '\\' in path:
+            raise Http404('Slika nije pronađena.')
+        # Preserve old public media links without copying private files to R2.
+        return HttpResponseRedirect(public_image_storage().url(path))
     response = serve(request, path, document_root=settings.MEDIA_ROOT)
     if response.status_code == 200:
         response['Content-Disposition'] = content_disposition_header(False, image_download_name(path))

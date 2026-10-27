@@ -1,5 +1,6 @@
 from decimal import Decimal
 from .image_uploads import AVIFFileField
+from .storage import public_image_storage
 from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -7,7 +8,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Brand(models.Model):
     name = models.CharField('Naziv', max_length=150)
-    logo = AVIFFileField('Logo', upload_to='brands/', blank=True)
+    logo = AVIFFileField('Logo', storage=public_image_storage, upload_to='brands/', blank=True)
 
     class Meta:
         verbose_name = 'Brend'
@@ -27,7 +28,7 @@ class Category(models.Model):
     seo_description = models.CharField('SEO opis', max_length=320, blank=True, help_text='Prazno koristi automatski opis. Preporuka oko 150–160 znakova.')
 
     name = models.CharField('Naziv', max_length=150)
-    image = AVIFFileField('Slika', upload_to='categories/', blank=True)
+    image = AVIFFileField('Slika', storage=public_image_storage, upload_to='categories/', blank=True)
 
     class Meta:
         verbose_name = 'Kategorija'
@@ -87,7 +88,7 @@ class Product(models.Model):
 
     name = models.CharField('Naziv', max_length=255)
     description = models.TextField('Opis', blank=True)
-    image = AVIFFileField('Slika', upload_to='products/', blank=True)
+    image = AVIFFileField('Slika', storage=public_image_storage, upload_to='products/', blank=True)
     price = models.DecimalField('Cijena', max_digits=10, decimal_places=2)
     original_price = models.DecimalField('Stara cijena', max_digits=10, decimal_places=2, null=True, blank=True)
     brand = models.ForeignKey(Brand, verbose_name='Brend', on_delete=models.SET_NULL, null=True, blank=True)
@@ -160,7 +161,7 @@ class Product(models.Model):
 class StoreSettings(models.Model):
     free_delivery_threshold = models.DecimalField('Besplatna dostava od (KM)', max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)], help_text='Ostavite prazno ako nema besplatne dostave prema iznosu.')
     delivery_price = models.DecimalField('Cijena dostave (KM)', max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)], help_text='Unesite 0 za besplatnu dostavu.')
-    logo = AVIFFileField('Logo trgovine', upload_to='store/', blank=True)
+    logo = AVIFFileField('Logo trgovine', storage=public_image_storage, upload_to='store/', blank=True)
 
     def delivery_cost(self, subtotal):
         if self.free_delivery_threshold is not None and subtotal >= self.free_delivery_threshold:
@@ -178,8 +179,8 @@ class Banner(models.Model):
         ('offer_right', 'Desna ponuda'), ('middle', 'Veliki banner — ispod ponuda'), ('footer', 'Donji banner'),
     ]
     title = models.CharField('Naslov', max_length=150)
-    image = AVIFFileField('Slika', upload_to='banners/', blank=True, max_bytes=80_000)
-    secondary_image = AVIFFileField('Dodatna slika', upload_to='banners/', blank=True, max_bytes=80_000)
+    image = AVIFFileField('Slika', storage=public_image_storage, upload_to='banners/', blank=True, max_bytes=80_000)
+    secondary_image = AVIFFileField('Dodatna slika', storage=public_image_storage, upload_to='banners/', blank=True, max_bytes=80_000)
     eyebrow = models.CharField('Tekst iznad naslova', max_length=150, blank=True)
     features = models.CharField('Artikli ispod dugmeta', max_length=300, blank=True, help_text='Odvojite nazive znakom |, npr. iPhone|MacBook|AirPods|Apple Watch')
     subtitle = models.TextField('Opis bannera', blank=True)
@@ -332,8 +333,8 @@ class SEOSettings(models.Model):
     structured_data = models.BooleanField('Uključi strukturirane podatke', default=True)
     social_title = models.CharField('Naslov za dijeljenje početne', max_length=160, blank=True)
     social_description = models.CharField('Opis za dijeljenje početne', max_length=320, blank=True)
-    social_image = models.ImageField('Slika za društvene mreže', upload_to='seo/', blank=True, help_text='Preporuka 1200 × 630 px, JPG ili PNG.')
-    favicon = models.ImageField('Ikonica sajta (favicon)', upload_to='seo/icons/', blank=True, help_text='Kvadratni PNG, preporuka 192 × 192 px ili veći.')
+    social_image = models.ImageField('Slika za društvene mreže', storage=public_image_storage, upload_to='seo/', blank=True, help_text='Preporuka 1200 × 630 px, JPG ili PNG.')
+    favicon = models.ImageField('Ikonica sajta (favicon)', storage=public_image_storage, upload_to='seo/icons/', blank=True, help_text='Kvadratni PNG, preporuka 192 × 192 px ili veći.')
     twitter_handle = models.CharField('X / Twitter korisničko ime', max_length=50, blank=True, help_text='Npr. @mojshop')
     google_review_url = models.URLField('Link za Google recenzije', max_length=1000, blank=True, help_text='HTTPS link za ostavljanje recenzije vašeg Google Business profila. Poziv se prikazuje nakon uspješno kreirane narudžbe; prazno ga isključuje.')
     google_verification = models.CharField('Google Search Console verifikacijski kod', max_length=255, blank=True, help_text='Samo vrijednost content iz verifikacijske meta oznake, bez HTML-a.')

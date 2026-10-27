@@ -1,17 +1,17 @@
 """Fit visible brand artwork into the same space as the Apple wordmark."""
 from functools import lru_cache
-from pathlib import Path
 
 from django import template
 from django.utils.html import format_html
 from PIL import Image, ImageChops
+from botocore.exceptions import BotoCoreError, ClientError
 
 register = template.Library()
 
 
 @lru_cache(maxsize=256)
-def logo_geometry(path, version):
-    with Image.open(path) as source:
+def logo_geometry(storage, name, version):
+    with storage.open(name, "rb") as artwork, Image.open(artwork) as source:
         image = source.convert('RGBA')
         white = Image.new('RGBA', image.size, 'white')
         white.alpha_composite(image)
@@ -28,9 +28,10 @@ def logo_geometry(path, version):
 @register.simple_tag
 def brand_logo(brand):
     try:
-        path = brand.logo.path
-        width, height, left, top = logo_geometry(path, Path(path).stat().st_mtime_ns)
-    except (OSError, ValueError, NotImplementedError):
+        storage = brand.logo.storage
+        version = storage.get_modified_time(brand.logo.name)
+        width, height, left, top = logo_geometry(storage, brand.logo.name, version)
+    except (OSError, ValueError, NotImplementedError, BotoCoreError, ClientError):
         return format_html('<img src="{}" alt="{}" loading="lazy">', brand.logo.url, brand.name)
     return format_html(
         '<span class="normalized-brand"><img src="{}" alt="{}" loading="lazy" style="width:{}px;height:{}px;left:{}px;top:{}px"></span>',
