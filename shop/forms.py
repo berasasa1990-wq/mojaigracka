@@ -9,7 +9,7 @@ class LogoForm(forms.ModelForm):
 
 
 
-from .models import Brand, Category, Product, ProductImage, Banner
+from .models import Brand, Category, Product, ProductImage, Banner, GiftPopupSettings
 from django.core.validators import MinValueValidator
 
 
@@ -48,6 +48,10 @@ class ProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from bera_licensing.services import module_enabled
+        if not module_enabled('wms'):
+            self.fields.pop('stock', None)
+            self.fields.pop('is_out_of_stock', None)
         if self.instance.pk:
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
 
@@ -110,7 +114,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in BANNER_IMAGE_OPTIONS.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'AVIF do 150 KB po slici. Različiti omjeri i rezolucije automatski se prilagođavaju, uz visok kvalitet (AVIF 90) i očuvanu transparentnost. Preporučeno 1920 × 720 px.'
+            self.fields[name].help_text = 'AVIF do 150 KB po slici. Različiti omjeri i rezolucije automatski se prilagođavaju, uz visok kvalitet (AVIF 85–90) i očuvanu transparentnost. Preporučeno 1920 × 720 px.'
 
     def clean(self):
         data = super().clean()
@@ -616,3 +620,17 @@ class BonusRewardOfferForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['product'].queryset = Product.objects.filter(is_active=True).order_by('name')
+
+
+class GiftPopupSettingsForm(forms.ModelForm):
+    class Meta:
+        model = GiftPopupSettings
+        fields = ['enabled', 'question', 'answer_a', 'answer_b', 'category', 'category_b', 'percent', 'delay_seconds']
+
+    def clean(self):
+        data = super().clean()
+        if data.get('enabled'):
+            for name in ('category', 'category_b'):
+                if not data.get(name) and name not in self.errors:
+                    self.add_error(name, 'Izaberite kategoriju.')
+        return data

@@ -111,7 +111,8 @@ Prihvataju se široki, uspravni i kvadratni originali unutar postojećih ulaznih
 limita (20 MiB / 12 megapiksela). Duža strana je najviše 1920 px; male slike
 se ne povećavaju. Omjer stranica i transparentnost ostaju sačuvani.
 
-Najviše šest AVIF pokušaja koristi quality=90, speed=10 i max_threads=1.
+Najviše šest AVIF pokušaja koristi quality=90 pa 85, speed=4 i max_threads=1.
+Prva dva pokušaja čuvaju punu pripremljenu rezoluciju prije smanjivanja.
 Ako rezultat prelazi limit, smanjuju se dimenzije, uz ponovno uzorkovanje iz
 prvobitno pripremljene slike da se izbjegne gubitak uslijed ponovljenog resizanja.
 Jednostavne slike mogu biti znatno manje od 80 KB; nema dopunjavanja fajla.
@@ -121,3 +122,8 @@ Greška encodera ili nedostižan limit vraća grešku forme bez spremanja slike.
 Obrađeni upload se ne enkodira ponovo pri spremanju modela. Postojeće slike
 zahtijevaju ponovni upload originala. Nije potrebna migracija baze.
 Ovaj profil zamjenjuje ranije opisane banner limite od 80, 90 i 100 KB.
+
+Banneri se prikazuju u prirodnom omjeru, punom širinom svog kontejnera, bez
+nametnutog aspect-ratio i praznih bočnih traka. AVIF speed=4 daje efikasniju
+kompresiju prije smanjivanja rezolucije; upload može trajati duže. Limit je
+i dalje 150 KB. Ranije umanjene slike zahtijevaju novi upload originala.

@@ -177,7 +177,7 @@ class ProductDetailTests(TestCase):
         self.assertContains(self.client.get('/noviteti/'), f'href="{product.get_absolute_url()}"')
         product.is_out_of_stock = True
         product.save()
-        self.assertContains(self.client.get(product.get_absolute_url()), 'Nije na stanju')
+        self.assertContains(self.client.get(product.get_absolute_url()), 'Na stanju')
         product.is_active = False
         product.save()
         self.assertEqual(self.client.get(product.get_absolute_url()).status_code, 404)
@@ -224,7 +224,7 @@ class CartTests(TestCase):
             self.assertEqual(self.client.post(self.url, {'quantity': quantity}).status_code, 400)
         self.product.is_out_of_stock = True
         self.product.save()
-        self.assertEqual(self.client.post(self.url, {'action': 'add'}).status_code, 400)
+        self.assertEqual(self.client.post(self.url, {'action': 'add'}).status_code, 302)
         self.assertEqual(self.client.get(self.url).status_code, 405)
 
     def test_csrf_and_ajax_count(self):

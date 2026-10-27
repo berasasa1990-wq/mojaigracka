@@ -1,0 +1,15 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/gift-popup.css' %}?v=3">
+<script src="{% static 'gift-popup.js' %}?v=1" defer></script>
+<dialog id="giftPopup" class="gift-popup" aria-labelledby="giftPopupTitle"
+        data-config-url="{% url 'gift_popup_config' %}" data-answer-url="{% url 'gift_popup_answer' %}">
+  <div class="gift-popup-top"><span class="gift-popup-eyebrow">MALO IZNENAĐENJE ZA VELIKU RADOST</span><button type="button" class="gift-popup-close" aria-label="Zatvori poklon ponudu">×</button></div>
+  <div class="gift-popup-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13"/><path d="M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg></div>
+  <h2 id="giftPopupTitle">Iznenađenje za vas</h2>
+  <div class="gift-popup-question">
+    <p>Odaberite odgovor i otkrijte dva mala razloga za osmijeh.</p>
+    <div class="gift-popup-answers"><button type="button" data-gift-answer="A"></button><button type="button" data-gift-answer="B"></button></div>
+  </div>
+  <div class="gift-popup-results" hidden></div>
+  <p class="gift-popup-status" role="status" aria-live="polite"></p>
+</dialog>

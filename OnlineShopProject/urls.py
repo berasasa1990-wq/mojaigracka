@@ -29,7 +29,12 @@ from shop.chatbot import chat
 
 from shop.media_views import product_share_image
 
+from shop import gift_popup
+
 urlpatterns = [
+    path('poklon/config/', gift_popup.config_view, name='gift_popup_config'),
+    path('poklon/odgovor/', gift_popup.answer_view, name='gift_popup_answer'),
+    path('poklon/izbor/', gift_popup.select_view, name='gift_popup_select'),
     path('artikal/<int:pk>/share.jpg', product_share_image, name='product_share_image'),
     path('bonus-nagrada/<int:pk>/dodaj/', bonus_reward_add, name='bonus_reward_add'),
     path('artikal/<int:pk>/obavijest/', stock_notification_subscribe, name='stock_notification_subscribe'),

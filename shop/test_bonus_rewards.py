@@ -54,7 +54,7 @@ class BonusRewardTests(TestCase):
 
     def test_unavailable_product_and_expired_order(self):
         self.show_offers()
-        self.product.is_out_of_stock = True
+        self.product.is_active = False
         self.product.save()
         self.assertEqual(self.client.post(self.url).status_code, 409)
         from datetime import timedelta

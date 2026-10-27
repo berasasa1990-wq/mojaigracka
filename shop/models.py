@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 from .image_uploads import AVIFFileField
 from .storage import public_image_storage
 from django.conf import settings
@@ -112,7 +113,7 @@ class Product(models.Model):
 
     @property
     def is_available(self):
-        return self.stock > 0 if self.wms_enabled else not self.is_out_of_stock
+        return self.stock > 0 if self.wms_enabled else True
 
     @property
     def cart_quantity_limit(self):
@@ -419,3 +420,21 @@ class ProductImage(models.Model):
         ordering = ['position', 'pk']
         verbose_name = 'Dodatna slika artikla'
         verbose_name_plural = 'Dodatne slike artikla'
+
+
+class GiftPopupSettings(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    enabled = models.BooleanField('Uključi poklon pop up', default=False)
+    question = models.CharField('Pitanje', max_length=250, default='Želite li iznenađenje za dječaka ili djevojčicu?')
+    answer_a = models.CharField('Odgovor A', max_length=80, default='Dječaka')
+    answer_b = models.CharField('Odgovor B', max_length=80, default='Djevojčicu')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, verbose_name='Kategorija za A', related_name='+')
+    category_b = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, verbose_name='Kategorija za B', related_name='+')
+    percent = models.DecimalField('Sniženje (%)', max_digits=5, decimal_places=2, default=10, validators=[MinValueValidator(0.01), MaxValueValidator(100)])
+    delay_seconds = models.PositiveIntegerField('Prikaži nakon (sekundi)', default=10, validators=[MaxValueValidator(3600)])
+    revision = models.UUIDField(default=uuid.uuid4, editable=False)
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.revision = uuid.uuid4()
+        super().save(*args, **kwargs)

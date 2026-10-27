@@ -18,6 +18,21 @@ class PanelOrdersTests(TestCase):
             response = self.client.get(url)
             self.assertContains(response, 'aria-label="2 novih neposlatih narudžbi"')
 
+    def test_home_order_badge_is_visible_only_to_superuser(self):
+        Order.objects.create(status='placed')
+        Order.objects.create(status='completed')
+        url = reverse('home')
+        self.assertNotContains(self.client.get(url), 'class="header-order-badge"')
+        customer = get_user_model().objects.create_user('badge-customer')
+        owner = get_user_model().objects.create_superuser('badge-owner', password='test-password')
+        for user in (customer, self.manager):
+            self.client.force_login(user)
+            self.assertNotContains(self.client.get(url), 'class="header-order-badge"')
+        self.client.force_login(owner)
+        self.assertContains(self.client.get(url),
+                            'class="header-order-badge" aria-label="1 novih neposlatih narudžbi">1</span>')
+        self.assertNotContains(self.client.get(reverse('sales')), 'class="header-order-badge"')
+
     def test_orders_show_customer_details_and_hide_drafts(self):
         Order.objects.create(customer_name='Novi kupac', status='placed')
         Order.objects.create(customer_name='Kupac u pripremi', status='draft')

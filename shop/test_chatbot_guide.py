@@ -19,7 +19,7 @@ class GuidedChatBotTests(TestCase):
         self.exact = Product.objects.create(name='Telefon 500', category=self.phone, price=500)
         Product.objects.create(name='Telefon skup', category=self.phone, price=501)
         Product.objects.create(name='Telefon skriven', category=self.phone, price=100, is_active=False)
-        Product.objects.create(name='Telefon rasprodan', category=self.phone, price=100, is_out_of_stock=True)
+        Product.objects.create(name='Telefon rasprodan', category=self.phone, price=100, is_active=False)
         Product.objects.create(name='Televizor 100', category=self.tv, price=100)
 
     def send(self, action=None, value=None, message=None, client=None):

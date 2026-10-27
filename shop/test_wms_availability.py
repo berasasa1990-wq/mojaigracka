@@ -21,7 +21,7 @@ class WmsAvailabilityTests(TestCase):
                     for manual in [False, True]:
                         self.product.stock = stock
                         self.product.is_out_of_stock = manual
-                        self.assertEqual(self.product.is_available, stock > 0 if enabled else not manual)
+                        self.assertEqual(self.product.is_available, stock > 0 if enabled else True)
 
     def test_disabled_wms_ignores_quantity_and_does_not_decrement_stock(self):
         with self.wms(False):
@@ -33,6 +33,23 @@ class WmsAvailabilityTests(TestCase):
             self.product.refresh_from_db()
             self.assertEqual(self.product.stock, 0)
             self.assertFalse(self.product.is_out_of_stock)
+
+    def test_disabled_wms_ignores_old_out_of_stock_flag_and_hides_stock_controls(self):
+        from shop.forms import ProductForm
+        self.product.is_out_of_stock = True
+        self.product.save(update_fields=['is_out_of_stock'])
+        with self.wms(False):
+            self.assertTrue(self.product.is_available)
+            self.assertEqual(self.product.cart_quantity_limit, 99)
+            self.assertContains(self.client.get(self.product.get_absolute_url()), 'Na stanju')
+            self.assertEqual(self.client.post(reverse('cart_update', args=[self.product.pk]),
+                                              {'quantity': 2}).status_code, 302)
+            form = ProductForm(instance=self.product)
+            self.assertNotIn('stock', form.fields)
+            self.assertNotIn('is_out_of_stock', form.fields)
+        with self.wms(True):
+            self.assertFalse(self.product.is_available)
+            self.assertIn('stock', ProductForm(instance=self.product).fields)
 
     def test_enabled_wms_zero_stock_blocks_cart_and_positive_stock_overrides_manual_flag(self):
         with self.wms(True):

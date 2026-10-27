@@ -121,7 +121,7 @@ class BundleSaleTests(TestCase):
         self.assertEqual(self.client.get('/korpa/').context['cart_total'], 256)
 
     def test_unavailable_bundle_does_not_add_partial_set(self):
-        self.third.is_out_of_stock = True
+        self.third.is_active = False
         self.third.save()
         response = self.client.post(f'/korpa/set/{self.first.pk}/')
         self.assertEqual(response.status_code, 400)

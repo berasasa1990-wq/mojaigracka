@@ -27,6 +27,17 @@
     {% for message in messages %}<p class="panel-feedback" role="status">{{ message }}</p>{% endfor %}
     {% if orders_section %}
     {% include "shop/partials/panel_orders.html" %}
+    {% elif gift_popup_section %}
+    <section class="panel-content edit-panel">
+      <h2>Poklon pop up</h2>
+      <p>Kupac bira odgovor A ili B, zatim jedan od dva nasumična dostupna artikla. Popust vrijedi za jedan komad odabranog artikla, jedan sat od odgovora. Ne zbraja se s drugim akcijama na isti komad; koristi se povoljnija cijena.</p>
+      <p>Popup se prikazuje na početnoj jednom po sesiji preglednika. Nakon promjene i spremanja postavki može se prikazati ponovo. Ako kategorija ima samo jedan dostupan artikal, prikazuje se jedan.</p>
+      <form method="post" class="panel-edit-form">{% csrf_token %}
+        {{ gift_popup_form.non_field_errors }}
+        {% for field in gift_popup_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}
+        <div class="form-actions"><button type="submit" class="home-link save-button">Sačuvaj</button></div>
+      </form>
+    </section>
     {% elif bonus_reward_section %}
     <section class="panel-content edit-panel">
       <h2>Bonus nagrada</h2>

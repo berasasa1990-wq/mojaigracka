@@ -85,8 +85,8 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
                     image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
 
-        # All banner fields require AVIF. Bound work to six fast encodes;
-        # hold codec quality high and adapt dimensions to the byte budget.
+        # All banner fields require AVIF. Bound work to six encodes;
+        # prefer full resolution at high quality before adapting dimensions.
         if max_bytes == MAX_BANNER_BYTES:
             if not features.check('avif'):
                 raise ValidationError('AVIF obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
@@ -94,14 +94,17 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             for banner_attempt in range(6):
                 attempts += 1
                 try:
-                    data = _encode(image, 'AVIF', quality=90, speed=10, max_threads=1)
+                    data = _encode(image, 'AVIF', quality=90 if banner_attempt == 0 else 85,
+                                   speed=4, max_threads=1)
                 except (OSError, ValueError, RuntimeError):
                     logger.warning('image_encode banner_avif_failed elapsed_ms=%.1f',
                                    (time.monotonic() - started) * 1000)
                     raise ValidationError('AVIF obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
                 if len(data) <= max_bytes:
                     return finish(data, 'AVIF')
-                scale = min(.85, max(.25, (max_bytes / len(data)) ** .5 * .92))
+                if banner_attempt == 0:
+                    continue  # Try high quality at full resolution before resizing.
+                scale = min(.95, max(.25, (max_bytes / len(data)) ** .5 * .98))
                 image = original.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
             raise ValidationError('Banner nije moguće obraditi do 150 KB. Odaberite drugu ispravnu sliku.')
 

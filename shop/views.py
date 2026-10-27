@@ -17,6 +17,7 @@ from .forms import PanelLoginForm
 
 
 PANEL_SECTIONS = [
+    {'slug': 'poklon-pop-up', 'title': 'Poklon pop up', 'description': 'Pitanje A/B, nasumični pokloni i poseban popust na početnoj.'},
     {'slug': 'premium-seo', 'title': 'Premium SEO', 'description': 'Meta opis sajta, SEO i društvene mreže.', 'module_code': 'premium_seo'},
     {'slug': 'bonus-nagrada', 'title': 'Bonus nagrada', 'description': 'Bonus nagrade i dodatne pogodnosti za kupce.', 'module_code': 'bonus_reward'},
     {'slug': 'wms', 'title': 'WMS', 'description': 'Pregled skladišta, artikala i zaliha trgovine.', 'url_name': 'wms:dashboard', 'module_code': 'wms'},
@@ -105,6 +106,20 @@ def panel(request, section=None, orders_in_wms=False):
             'sections': PANEL_SECTIONS, 'selected': selected, 'site_settings': store_settings,
             'section': 'orders' if orders_in_wms else section,
             'orders_section': True, 'orders': orders, 'order_filter': order_filter, 'order_query': order_query,
+        })
+    if section == 'poklon-pop-up':
+        from .models import GiftPopupSettings
+        from .forms import GiftPopupSettingsForm
+        config = GiftPopupSettings.objects.filter(pk=1).first() or GiftPopupSettings(pk=1)
+        form = GiftPopupSettingsForm(request.POST if request.method == 'POST' else None, instance=config)
+        if request.method == 'POST' and form.is_valid():
+            form.save()
+            from django.contrib import messages
+            messages.success(request, 'Poklon pop up je sačuvan.')
+            return redirect('panel_section', section='poklon-pop-up')
+        return render(request, 'shop/panel.html', {
+            'sections': PANEL_SECTIONS, 'selected': selected, 'site_settings': store_settings,
+            'gift_popup_section': True, 'gift_popup_form': form,
         })
     if section == 'chatbot':
         from .forms import ChatBotSettingsForm
@@ -567,7 +582,8 @@ def checkout(request):
                 order.customer = request.user if request.user.is_authenticated else None
                 store = StoreSettings.objects.filter(pk=1).first()
                 from .cart import priced_items
-                priced = priced_items(products, saved)
+                from .gift_popup import active_claim
+                priced = priced_items(products, saved, gift_claim=active_claim(request))
                 subtotal = sum(item['subtotal'] for item in priced)
                 from .loyalty import applied_loyalty_percent, loyalty_amount
                 order.loyalty_percent = applied_loyalty_percent(request)
@@ -592,6 +608,7 @@ def checkout(request):
                         product._stock_reason = f'Narudžba #{order.pk} preko sajta'
                         product.save(update_fields=['stock'])
                 request.session['cart'] = {}
+                request.session.pop('gift_popup_offer', None)
                 request.session.pop('loyalty_customer', None)
                 request.session['last_order'] = order.pk
                 return redirect(reverse('checkout') + '?success=1')

@@ -37,7 +37,7 @@ class CartOfferTests(TestCase):
         self.assertIsNone(self.add(self.first).json()['offer'])
 
     def test_unavailable_second_not_offered(self):
-        self.second.is_out_of_stock = True
+        self.second.is_active = False
         self.second.save()
         self.assertIsNone(self.add(self.first).json()['offer'])
 

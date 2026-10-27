@@ -181,9 +181,10 @@ class HeroBannerTests(TestCase):
             self.assertEqual(encode.call_count, 6)
             self.assertEqual(encode.call_args_list[0].args[0].size, (1920, 720))
             self.assertLess(encode.call_args_list[-1].args[0].width, 1920)
-            for call in encode.call_args_list:
-                self.assertEqual(call.kwargs['quality'], 90)
-                self.assertEqual(call.kwargs['speed'], 10)
+            self.assertEqual(encode.call_args_list[1].args[0].size, (1920, 720))
+            for index, call in enumerate(encode.call_args_list):
+                self.assertEqual(call.kwargs['quality'], 90 if index == 0 else 85)
+                self.assertEqual(call.kwargs['speed'], 4)
                 self.assertEqual(call.kwargs['max_threads'], 1)
 
     def test_large_detailed_banner_is_automatically_fitted_to_150kb(self):

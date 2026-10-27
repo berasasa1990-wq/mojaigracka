@@ -12,7 +12,7 @@ from .stock_notifications import notify_available_product
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class StockNotificationTests(TestCase):
     def setUp(self):
-        self.wms = patch('bera_licensing.services.module_enabled', return_value=False)
+        self.wms = patch('bera_licensing.services.module_enabled', return_value=True)
         self.wms.start()
         self.addCleanup(self.wms.stop)
         self.product = Product.objects.create(name='Telefon', price=100, is_out_of_stock=True)
@@ -35,18 +35,18 @@ class StockNotificationTests(TestCase):
         self.assertEqual(self.client.post(self.url).status_code, 200)
         self.assertEqual(StockNotification.objects.get().email, user.email)
 
-    def test_manual_restock_sends_once_after_commit_and_can_resubscribe(self):
+    def test_restock_sends_once_after_commit_and_can_resubscribe(self):
         self.subscribe()
         with self.captureOnCommitCallbacks(execute=True):
-            self.product.is_out_of_stock = False
-            self.product.save(update_fields=['is_out_of_stock'])
+            self.product.stock = 2
+            self.product.save(update_fields=['stock'])
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('Telefon', mail.outbox[0].body)
         self.assertIn(self.product.get_absolute_url(), mail.outbox[0].body)
         notify_available_product(self.product.pk)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(self.subscribe().status_code, 409)
-        self.product.is_out_of_stock = True
+        self.product.stock = 0
         self.product.save()
         self.subscribe()
         self.assertIsNone(StockNotification.objects.get().notified_at)
@@ -64,7 +64,7 @@ class StockNotificationTests(TestCase):
 
     def test_delivery_failure_remains_pending_for_retry(self):
         self.subscribe()
-        self.product.is_out_of_stock = False
+        self.product.stock = 2
         self.product.save()
         with patch('shop.stock_notifications.send_mail', side_effect=OSError('SMTP unavailable')):
             with self.assertLogs('shop.stock_notifications', level='ERROR'):

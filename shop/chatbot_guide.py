@@ -55,7 +55,7 @@ def budget_reply(request, config, category):
 
 def results_reply(request, config, category, budget, offset=0):
     from bera_licensing.services import module_enabled
-    availability = {'stock__gt': 0} if module_enabled('wms') else {'is_out_of_stock': False}
+    availability = {'stock__gt': 0} if module_enabled('wms') else {}
     products = Product.objects.filter(category=category, is_active=True, price__lte=budget, **availability).order_by('price', 'name', 'pk')
     count = products.count()
     if offset >= count:

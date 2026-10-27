@@ -8,7 +8,8 @@ def cart_context(request):
     quantities = {str(p.pk): min(saved[str(p.pk)], p.cart_quantity_limit) for p in products if p.is_available}
     if request.method == 'GET' and saved != quantities:
         request.session['cart'] = quantities
-    items = priced_items(products, quantities)
+    from .gift_popup import active_claim
+    items = priced_items(products, quantities, gift_claim=active_claim(request))
     for item in items:
         item['plus_offer'] = article_plus_offer(item['product'], quantities)
         item['quantity_offers'] = quantity_offers(item['product'], item['quantity'])
@@ -27,7 +28,7 @@ def cart_context(request):
             'cart_total': subtotal}
 
 
-def priced_items(products, quantities):
+def priced_items(products, quantities, *, gift_claim=None):
     """One discounted second item per regular first item; use the best offer first."""
     products = {p.pk: p for p in products if quantities.get(str(p.pk), 0) > 0}
     offers = {}
@@ -64,6 +65,8 @@ def priced_items(products, quantities):
         items.append({'product': product, 'quantity': quantity, 'price_groups': groups, 'promotion_groups': promotion_groups, 'plus_discounts': plus_discounts, 'regular_quantity': remaining, 'quantity_percent': quantity_percent, 'quantity_price': quantity_price,
                       'subtotal': sum((price * count for price, count in groups), Decimal('0.00'))})
     apply_bundle_discounts(items, products, quantities)
+    from .gift_popup import apply_gift_discount
+    apply_gift_discount(items, gift_claim)
     return items
 
 

@@ -418,11 +418,11 @@
 
 /* Large uploaded homepage banner between the offers and new products. */
 .bera-middle-banner{margin:28px var(--inset);border-radius:14px;overflow:hidden;background:var(--brand-soft)}
-.bera-middle-banner>a{display:block}.bera-middle-banner img{display:block;width:100%;height:auto;aspect-ratio:8/3;object-fit:contain}
+.bera-middle-banner>a{display:block}.bera-middle-banner img{display:block;width:100%;height:auto;object-fit:contain}
 @media(max-width:600px){.bera-middle-banner{margin-top:20px;margin-bottom:20px;border-radius:10px}}
 
 .bera-uploaded-hero{margin:28px var(--inset);border-radius:14px;overflow:hidden;background:var(--brand-soft)}
-.bera-uploaded-hero>a{display:block}.bera-uploaded-hero img{display:block;width:100%;height:auto;aspect-ratio:8/3;object-fit:contain}
+.bera-uploaded-hero>a{display:block}.bera-uploaded-hero img{display:block;width:100%;height:auto;object-fit:contain}
 
 /* Header category menu interactions. */
 .bera-category-menu summary{transition:color .2s ease,transform .2s ease}
@@ -580,3 +580,5 @@
 .product-image-layout{min-width:0;width:100%}.product-image-layout.has-thumbnails{display:grid;grid-template-columns:72px minmax(0,1fr);gap:16px;position:relative;align-items:stretch}.product-image-layout.has-thumbnails>.product-detail-gallery{grid-column:2;min-width:0}.product-thumbnails{position:absolute;left:0;top:0;bottom:0;width:72px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;overflow-y:auto;scrollbar-width:none;padding:2px;box-sizing:border-box}.product-thumbnail{width:66px;height:66px;padding:3px;background:#fff;border:1px solid #d2e0e9;border-radius:8px;flex-shrink:0}.product-thumbnail img{display:block;width:100%;height:100%;object-fit:contain}.product-thumbnail.is-active{border:2px solid #008fc6}.product-thumbnail:focus-visible{outline:2px solid #008fc6;outline-offset:2px}.product-image-layout .product-detail-photo{min-width:0}@media(max-width:600px){.product-image-layout.has-thumbnails{grid-template-columns:52px minmax(0,1fr);gap:8px}.product-thumbnail{width:46px;height:46px}.product-thumbnails{width:52px;gap:8px}}
 
 .product-thumbnails::-webkit-scrollbar{display:none}
+
+.settings-link{position:relative}.settings-link .header-order-badge{position:absolute;top:0;right:-9px;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;box-sizing:border-box;padding:0 4px;border:1px solid var(--blue);border-radius:50%;background:#fff;color:var(--blue);font-size:10px;font-weight:700;line-height:1}
