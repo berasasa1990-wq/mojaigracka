@@ -104,12 +104,20 @@ manju rezoluciju. Transparentnost se čuva, MIME i ekstenzija odgovaraju formatu
 Promjena važi za nove uploadove; postojeće datoteke nisu izmijenjene.
 39 relevantnih testova prolazi; check i provjera migracija prolaze.
 
-## Aktuelni banner profil: čistija slika do 100 KB
+## Aktuelni banner profil: različite dimenzije, do 90 KB
 
-Banneri sada imaju do 100.000 bajtova i 1920 px; samo AVIF. Najviše tri pokušaja
-quality=85/75/65, speed=10, max_threads=1, pri istoj pripremljenoj rezoluciji.
-Nema više pada na quality 50/45 niti dodatnog smanjivanja dimenzija radi limita.
-Ako ne stane pri ovom kvalitetu, forma vraća grešku umjesto zamagljenog rezultata.
-Ovo zamjenjuje prethodni limit bannera 80 KB. Artikli ostaju do 30 KB.
-Za veći kvalitet postojećeg bannera ponovo uploadovati originalnu datoteku.
-28 testova bannera/uploadova prolazi; check i provjera migracija prolaze.
+Sve pozicije i obje slike bannera koriste AVIF do 90.000 bajtova po slici.
+Prihvataju se široki, uspravni i kvadratni originali unutar postojećih ulaznih
+limita (20 MiB / 12 megapiksela). Duža strana je najviše 1920 px; male slike
+se ne povećavaju. Omjer stranica i transparentnost ostaju sačuvani.
+
+Najviše šest AVIF pokušaja koristi quality=80, speed=10 i max_threads=1.
+Ako rezultat prelazi limit, smanjuju se dimenzije, uz ponovno uzorkovanje iz
+prvobitno pripremljene slike da se izbjegne gubitak uslijed ponovljenog resizanja.
+Jednostavne slike mogu biti znatno manje od 80 KB; nema dopunjavanja fajla.
+Potpuno isti kvalitet i rezolucija nisu garantovani za složene slike u 90 KB.
+Greška encodera ili nedostižan limit vraća grešku forme bez spremanja slike.
+
+Obrađeni upload se ne enkodira ponovo pri spremanju modela. Postojeće slike
+zahtijevaju ponovni upload originala. Nije potrebna migracija baze.
+Ovaj profil zamjenjuje ranije opisane banner limite od 80 i 100 KB.

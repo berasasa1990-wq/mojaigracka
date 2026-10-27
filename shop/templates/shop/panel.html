@@ -172,7 +172,7 @@
     </section>
     {% endif %}
     <section class="panel-content" aria-label="Pregled: {{ selected.title }}">
-      {% if selected.slug == 'banneri' %}<p>Glavni banner ispod headera: odaberite poziciju <strong>Glavni banner</strong> i učitajte sliku <strong>1600 × 600 px</strong> (AVIF do 80 KB). Slika se prikazuje preko cijele širine, bez rezanja. Veliki banner na početnoj, umjesto najprodavanijih proizvoda: odaberite poziciju <strong>Veliki banner — ispod ponuda</strong> i učitajte sliku preporučene dimenzije <strong>1600 × 600 px</strong>.</p>{% endif %}
+      {% if selected.slug == 'banneri' %}<p>Glavni banner ispod headera: odaberite poziciju <strong>Glavni banner</strong> i učitajte sliku bilo kojeg omjera (preporučeno <strong>1920 × 720 px</strong>, AVIF do 90 KB). Slika se prikazuje preko cijele širine, bez rezanja. Veliki banner na početnoj, umjesto najprodavanijih proizvoda: odaberite poziciju <strong>Veliki banner — ispod ponuda</strong> i učitajte sliku preporučene dimenzije <strong>1920 × 720 px</strong> (AVIF do 90 KB).</p>{% endif %}
       <div class="content-heading"><h2>Pregled</h2>{% if can_add %}<a class="home-link" href="{% url 'panel_add' selected.slug %}">Dodaj</a>{% endif %}<span>{{ rows|length }} stavki</span></div>
       {% if selected.slug == 'korisnici' %}
       <div class="panel-users-scroll"><table class="panel-users"><thead><tr><th>Korisničko ime</th><th>Ime i prezime</th><th>E-mail</th><th>Registracija</th><th>Status</th><th>Uloga</th></tr></thead><tbody>
