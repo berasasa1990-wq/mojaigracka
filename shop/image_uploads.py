@@ -34,7 +34,7 @@ def _encode(image, format, **options):
 
 
 def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None):
-    """Bound encoder work: at most one fast AVIF, then bounded WebP/PNG fallback."""
+    """Bound encoder work; banners use AVIF only, other images allow fallback."""
     max_side = max_side or (1280 if max_bytes > MAX_IMAGE_BYTES else 960)
     policy = (max_bytes, max_side, prefer_webp, quality)
     if getattr(upload, '_optimized_image', None) == policy and upload.size <= max_bytes:
@@ -68,6 +68,26 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             outcome, result_format = 'ok', format
             return result
 
+        # All banner fields require AVIF. Bound work to four fast encodes;
+        # keep resolution for the first three, resize only as a last resort.
+        if max_bytes == 80_000:
+            if not features.check('avif'):
+                raise ValidationError('AVIF obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
+            for banner_quality in (80, 65, 50, 45):
+                attempts += 1
+                try:
+                    data = _encode(image, 'AVIF', quality=banner_quality, speed=10, max_threads=1)
+                except (OSError, ValueError, RuntimeError):
+                    logger.warning('image_encode banner_avif_failed elapsed_ms=%.1f',
+                                   (time.monotonic() - started) * 1000)
+                    raise ValidationError('AVIF obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
+                if len(data) <= max_bytes:
+                    return finish(data, 'AVIF')
+                if banner_quality == 50:
+                    scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
+                    image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
+            raise ValidationError('Banner ne stane u 80 KB. Odaberite sliku manje rezolucije ili s manje detalja.')
+
         # Preserve logo edges/alpha losslessly if a cheap PNG already fits.
         if prefer_webp:
             attempts += 1
@@ -93,8 +113,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             attempts += 1
             try:
                 if fallback_format == 'WEBP':
-                    data = _encode(image, 'WEBP', quality=(max(45, (quality or 85) - attempt * 20) if max_bytes == 80_000
-                                            else max(35, (quality or 85) - attempt * 10)),
+                    data = _encode(image, 'WEBP', quality=max(35, (quality or 85) - attempt * 10),
                                    method=0, alpha_quality=100, exact=True)
                 else:
                     data = _encode(image, 'PNG', compress_level=3)
@@ -108,11 +127,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                 data = _encode(image, 'PNG', compress_level=3)
             if len(data) <= max_bytes:
                 return finish(data, fallback_format)
-            # Try several WebP qualities at full banner resolution before resizing.
-            if max_bytes == 80_000 and fallback_format == 'WEBP' and attempt < 2:
-                continue
-            scale = .75 if max_bytes == 80_000 and fallback_format == 'WEBP' else .6
-            image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
+            image = image.resize(tuple(max(1, int(n * .6)) for n in image.size), Image.Resampling.LANCZOS)
         raise ValidationError(f'Slika se ne može smanjiti na {max_bytes // 1000} KB. Odaberite drugu sliku.')
     except (UnidentifiedImageError, OSError, ValueError, RuntimeError,
             Image.DecompressionBombError, Image.DecompressionBombWarning):

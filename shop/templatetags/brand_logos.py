@@ -1,5 +1,9 @@
 """Fit visible brand artwork into the same space as the Apple wordmark."""
 from functools import lru_cache
+import hashlib
+import time
+from django.core.cache import cache
+from django.core.files.storage import FileSystemStorage
 
 from django import template
 from django.utils.html import format_html
@@ -29,8 +33,26 @@ def logo_geometry(storage, name, version):
 def brand_logo(brand):
     try:
         storage = brand.logo.storage
-        version = storage.get_modified_time(brand.logo.name)
-        width, height, left, top = logo_geometry(storage, brand.logo.name, version)
+        name = brand.logo.name
+        if isinstance(storage, FileSystemStorage):
+            geometry = logo_geometry(storage, name, storage.get_modified_time(name))
+        else:
+            # Uploaded object names are unique (file_overwrite=False). Avoid a
+            # remote HEAD per logo on every page render; refresh within 5 minutes.
+            namespace = (storage.__class__.__module__, storage.__class__.__name__,
+                         getattr(storage, 'bucket_name', ''), getattr(storage, 'endpoint_url', ''), name)
+            key = 'brand-geometry:' + hashlib.sha256(repr(namespace).encode()).hexdigest()
+            geometry = cache.get(key)
+            if geometry is False:
+                return format_html('<img src="{}" alt="{}" loading="lazy">', brand.logo.url, brand.name)
+            if geometry is None:
+                try:
+                    geometry = logo_geometry(storage, name, int(time.time() // 300))
+                except (OSError, ValueError, NotImplementedError, BotoCoreError, ClientError):
+                    cache.set(key, False, 30)
+                    raise
+                cache.set(key, geometry, 300)
+        width, height, left, top = geometry
     except (OSError, ValueError, NotImplementedError, BotoCoreError, ClientError):
         return format_html('<img src="{}" alt="{}" loading="lazy">', brand.logo.url, brand.name)
     return format_html(

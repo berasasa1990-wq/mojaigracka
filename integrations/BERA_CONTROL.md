@@ -89,3 +89,101 @@ Vlasnik izdaje zaseban kod i određuje trajanje za Ponudu +, Količinski popust 
 Panel akcija prikazuje zaključane vrste kao onemogućene opcije i upućuje na aktivaciju. Backend odbija direktne pokušaje spremanja takve akcije. Korpa i checkout ponovo provjeravaju aktivaciju i rok pri svakom obračunu. Isključeni/istekli moduli ne daju popuste, ne nude promocije na stranici artikla i ne ulaze u akcijsku ponudu po toj osnovi. Bundle POST endpoint također zahtijeva važeću aktivaciju.
 
 Postojeći artikli i postavke promocija nisu obrisani niti mijenjani. Nakon ponovne aktivacije njihove se postavke ponovo koriste. Regularno sniženje cijene dostupno je bez koda, uključujući i kada su svi plaćeni moduli isključeni.
+
+## Jednokratna trajna lozinka na Render Free planu
+
+Komanda `python manage.py bera_control_initialize` čita
+`BERA_CONTROL_INITIAL_PASSWORD` iz environmenta samo ako BERA CONTROL još nije
+postavljen. Lozinka mora zadovoljiti Django validatore i imati najmanje 12 znakova.
+Sprema se hash u ControlState.password_hash u istoj bazi aplikacije. Nije vezana
+za lokalni disk, session ili environment nakon prvog postavljanja.
+
+Na Renderu postaviti BERA_CONTROL_INITIAL_PASSWORD kao tajnu varijablu, pa
+jednokratno koristiti Build Command (postojeće migracije moraju biti primijenjene):
+
+```sh
+python -m pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py bera_control_initialize
+```
+
+Nakon uspjeha ukloniti BERA_CONTROL_INITIAL_PASSWORD i vratiti standardni Build
+Command bez ove komande. Prijava je na /bera-control/. Ponovljena inicijalizacija
+je sigurna: preskače postojeću lozinku čak i ako je environment promijenjen ili
+obrisan. Ne resetuje aktivne sesije, generaciju ili datum postavljanja. Za već
+postavljenu/zaboravljenu lozinku ostaje poseban bera_control_recover postupak;
+prvo postavljanje ne može zaobići postojeću lozinku. Javna setup forma i token
+zaštita ostaju nepromijenjeni. Tajne se ne ispisuju u izlazu komande.
+
+Trajnost zavisi od iste sačuvane PostgreSQL baze. Nova/obrisana/istekla baza nema
+stari hash. Lokalna SQLite lozinka ne prenosi se automatski u Render PostgreSQL.
+Nema nove migracije; implementacija nije pokretala komandu nad korisničkom
+bazom, niti push/deploy.
+
+
+## Bootstrap token: dijagnoza i ispravka (2026-10-27)
+
+Prijavljena poruka „Prijava nije uspjela. Nakon 5 pokušaja pristup se zaključava
+na 15 minuta.” nastaje ISKLJUČIVO u views.login na /bera-control/. Setup view
+na /bera-control/setup/ ne prikazuje tu poruku. Ona znači neuspješnu prijavu
+lozinkom; nije dokaz neispravnog bootstrap tokena. Token je za prvo postavljanje,
+ne za kasniju prijavu. Prijavljeni problem toka je reprodukovan slanjem tokena
+u password polje login forme. Ako je panel već postavljen, koristi se odabrana
+lozinka ili poseban server-only recovery; ne otvara se ponovo javni setup.
+
+Ispravka:
+- Neinicijalizovan login automatski preusmjerava na setup prije provjere lozinke,
+  pa token unesen na pogrešno mjesto ne stvara login lockout.
+- Setup prikazuje prvo token, zatim novu lozinku i potvrdu. Nakon uspjeha jasno
+  kaže da se treba prijaviti NOVOM LOZINKOM. Token ne postaje lozinka.
+- Neispravan/istekao/zamijenjen token ostaje HTTP 403, uz razumljivu grešku forme,
+  bez otkrivanja tokena. Već inicijalizovan setup ostaje 404.
+
+Skladištenje i worker procesi:
+- issue_bootstrap koristi secrets.token_urlsafe(32), a u ControlState(pk=1)
+  sprema samo SHA-256 UTF-8 hash i timezone-aware bootstrap_expires=now+10 minuta.
+- initialize provjerava isti DB zapis i uslov bootstrap_expires > timezone.now(),
+  tako da je token istekao tačno na granici od deset minuta.
+- Jedna uslovna SQL UPDATE operacija atomarno postavlja password_hash,
+  initialized_at i generation te briše bootstrap_digest/bootstrap_expires.
+  Samo jedan konkurentni inicijalizator može uspjeti. Novo izdavanje poništava
+  prethodni token. Ne može prepisati postojeći password_hash.
+- Izdavanje i njegov AuditEvent sada su u istoj transakciji. Funkcije su označene
+  sensitive_variables; setup POST je sensitive_post_parameters. AuditEvent nema
+  token. Plaintext se ne sprema u cache, session ili aplikacijske logove.
+- Shell i Gunicorn koriste default bazu iz istog settings modula. Produkcija već
+  zahtijeva PostgreSQL DATABASE_URL; lokalni SQLite fallback postoji samo u
+  eksplicitnom development modu. Svi workeri moraju koristiti istu produkcijsku
+  bazu. Local-memory cache i RequestReadCacheMiddleware ne učestvuju u tokenu.
+- Token hash ne koristi SECRET_KEY. Različit SECRET_KEY između procesa zato ne
+  može promijeniti bootstrap hash, ali može pokvariti session/CSRF; proizvodni
+  SECRET_KEY i dalje mora biti isti/stabilan. USE_TZ=True, TIME_ZONE=UTC u projektu.
+- Test koristi dva stvarna odvojena Python procesa sa zajedničkom privremenom
+  SQLite bazom, različitim SECRET_KEY i UTC/Asia-Tokyo postavkama, bez ispisa
+  tokena. Time se provjerava odsustvo per-process memorijskog oslanjanja; ovo
+  nije test povezivanja stvarnog Render PostgreSQL servera.
+
+Sigurno izdavanje u interaktivnom Render Shellu:
+
+```sh
+python manage.py bera_control_bootstrap
+```
+
+Token se prikazuje samo u interaktivnom terminalu. Ne koristiti u buildu/start
+komandi niti kopirati u logove/chat. Za skriptovani rad koristiti opciju
+--output-file /sigurna/nova-putanja (novi fajl, mod 0600, bez prepisivanja ili
+praćenja postojećeg symlinka); stdout tada nema token. Digest u bazi je trajni
+zajednički izvor istine; privatni fajl služi samo isporuci tokena operatoru.
+
+Nakon izdavanja odmah otvoriti /bera-control/setup/, kopirati SAMO token u
+polje tokena i odabrati novu lozinku. Nakon postavljanja prijaviti se novom
+lozinkom na /bera-control/. Ako je panel već inicijalizovan, koristiti postojeću
+lozinku ili bera_control_recover, a ne novi bootstrap.
+
+Stvarna produkcijska baza nije čitana/mijenjana. Nije potvrđen nikakav različit
+Render DATABASE_URL ili clock drift: za takav zaključak nema produkcijskih
+podataka. Potvrđena dostavljena poruka pripada pogrešnoj formi za token. Nema
+nove migracije, push-a ili deploya.
+
+Rezultati provjera ove ispravke: 33 ciljana testa prolaze, zatim 7 novih
+bootstrap testova ponovo prolazi nakon završnih poruka u formi. Cijeli skup:
+307 testova, 306 uspješnih; ostaje isti ranije poznati pad Premium SEO testa.
+check, makemigrations --check --dry-run i git diff --check prolaze.

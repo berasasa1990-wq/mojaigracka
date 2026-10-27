@@ -19,7 +19,7 @@ class HeroBannerTests(TestCase):
             self.assertTrue(form.is_valid(), form.errors)
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
-                self.assertTrue(image.name.endswith(('.avif', '.webp', '.png')))
+                self.assertTrue(image.name.endswith('.avif'))
                 self.assertLessEqual(image.size, 80_000)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
@@ -119,7 +119,7 @@ class HeroBannerTests(TestCase):
             attempts = encode.call_count
             banner = form.save()
             self.assertEqual(encode.call_count, attempts)
-            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 1)
+            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 4)
             self.assertLessEqual(banner.image.size, 80_000)
             with banner.image.open('rb') as file, Image.open(file) as image:
                 self.assertLessEqual(max(image.size), 1600)
@@ -148,4 +148,21 @@ class HeroBannerTests(TestCase):
                     self.assertTrue(form.is_valid(), form.errors)
                     banner = form.save()
                     for name in ('image', 'secondary_image'):
-                        self.assertLessEqual(getattr(banner, name).size, 80_000)
+                        stored = getattr(banner, name)
+                        self.assertLessEqual(stored.size, 80_000)
+                        self.assertTrue(stored.name.endswith('.avif'))
+                        with stored.open('rb') as file, Image.open(file) as image:
+                            self.assertEqual(image.format, 'AVIF')
+
+
+    def test_avif_banner_failure_is_form_error_and_keeps_existing_image(self):
+        from unittest.mock import patch
+
+        banner = Banner.objects.get(position='hero')
+        original_name = banner.image.name
+        with patch('shop.image_uploads._encode', side_effect=OSError('encoder failed')):
+            form = BannerForm({'position': 'hero', 'title': 'Banner'}, {'image': upload()}, instance=banner)
+            self.assertFalse(form.is_valid())
+            self.assertIn('image', form.errors)
+        banner.refresh_from_db()
+        self.assertEqual(banner.image.name, original_name)

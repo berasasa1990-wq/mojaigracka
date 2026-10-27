@@ -77,7 +77,9 @@ def module_enabled(code):
         return False
     from bera_control.models import ModuleActivation
     from .registry import IMPLEMENTED
-    activation = ModuleActivation.objects.filter(module=code).first()
+    from shop.request_cache import request_read
+    activation = request_read(('module-activation', code),
+                              lambda: ModuleActivation.objects.filter(module=code).first())
     if activation is not None:
         return bool(code in IMPLEMENTED and activation.activated_at is not None and (activation.expires_at is None or timezone.now() < activation.expires_at))
     from .registry import PAID_SALE_MODULES

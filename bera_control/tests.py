@@ -167,7 +167,10 @@ class ControlTests(TestCase):
 
     def test_management_commands_and_recovery_confirmation(self):
         out = StringIO()
-        call_command('bera_control_bootstrap', stdout=out)
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        with TemporaryDirectory() as directory:
+            call_command('bera_control_bootstrap', output_file=str(Path(directory) / 'token'), stdout=out)
         self.assertTrue(ControlState.objects.get(pk=1).bootstrap_digest)
         self.initialize()
         with self.assertRaises(CommandError):

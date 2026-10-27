@@ -20,32 +20,60 @@ def validate_control_password(password):
 
 
 def local_allows(code):
-    return not ModuleSwitch.objects.filter(code=code, enabled=False).exists()
+    from shop.request_cache import request_read
+    return request_read(('module-switch', code),
+                        lambda: not ModuleSwitch.objects.filter(code=code, enabled=False).exists())
 
 
+@sensitive_variables('token')
 def issue_bootstrap():
     token = secrets.token_urlsafe(32)
-    changed = ControlState.objects.filter(pk=1, initialized_at__isnull=True).update(
-        bootstrap_digest=hashlib.sha256(token.encode()).hexdigest(),
-        bootstrap_expires=timezone.now() + timedelta(minutes=10))
-    if not changed:
-        raise PermissionDenied('Panel je već inicijalizovan.')
-    AuditEvent.objects.create(action='bootstrap_issued')
+    with transaction.atomic():
+        changed = ControlState.objects.filter(pk=1, initialized_at__isnull=True, password_hash='').update(
+            bootstrap_digest=hashlib.sha256(token.encode('utf-8')).hexdigest(),
+            bootstrap_expires=timezone.now() + timedelta(minutes=10))
+        if not changed:
+            raise PermissionDenied('Panel je već inicijalizovan ili nije spreman za prvo postavljanje.')
+        AuditEvent.objects.create(action='bootstrap_issued')
     return token
 
 
 @sensitive_variables('token', 'password')
 def initialize(token, password, address=None):
     validate_control_password(password)
-    digest = hashlib.sha256(token.encode()).hexdigest()
+    if not isinstance(token, str) or not 1 <= len(token.strip()) <= 128:
+        raise PermissionDenied('Token nije važeći.')
+    digest = hashlib.sha256(token.strip().encode('utf-8')).hexdigest()
     with transaction.atomic():
-        changed = ControlState.objects.filter(pk=1, initialized_at__isnull=True,
+        changed = ControlState.objects.filter(pk=1, initialized_at__isnull=True, password_hash='',
             bootstrap_digest=digest, bootstrap_expires__gt=timezone.now()).update(
                 password_hash=make_password(password), initialized_at=timezone.now(),
-                bootstrap_digest='', bootstrap_expires=None, generation=F('generation') + 1)
+                bootstrap_digest='', bootstrap_expires=None, generation=F('generation') + 1,
+                failures=0, locked_until=None)
         if not changed:
             raise PermissionDenied('Token nije važeći ili je panel već inicijalizovan.')
         AuditEvent.objects.create(action='initialized', address=address)
+
+
+@sensitive_variables('password')
+def initialize_password_once(password):
+    """Server-only first setup; retries/deploys never replace an existing password."""
+    with transaction.atomic():
+        state, _ = ControlState.objects.get_or_create(pk=1)
+        if state.initialized_at:
+            return False
+        if state.password_hash:
+            raise PermissionDenied('Postojeća lozinka se ne može prepisati prvom inicijalizacijom.')
+        validate_control_password(password)
+        changed = ControlState.objects.filter(pk=1, initialized_at__isnull=True,
+                                              password_hash='').update(
+            password_hash=make_password(password), initialized_at=timezone.now(),
+            bootstrap_digest='', bootstrap_expires=None, generation=F('generation') + 1,
+            failures=0, locked_until=None,
+        )
+        if changed:
+            AuditEvent.objects.create(action='initialized')
+        return bool(changed)
 
 
 @sensitive_variables('password')

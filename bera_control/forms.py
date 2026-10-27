@@ -14,6 +14,7 @@ class PasswordForm(forms.Form):
 
 
 class BootstrapForm(PasswordForm):
+    field_order = ['token', 'password', 'confirm']
     token = forms.CharField(label='Jednokratni bootstrap token', max_length=128, widget=forms.PasswordInput(attrs={'autocomplete': 'off'}))
 
 

@@ -55,7 +55,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in BANNER_IMAGE_OPTIONS.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'Do 80 KB po slici, preporučeno 1600 × 600 px. Kvalitet i rezolucija prilagođavaju se sadržaju, uz očuvanu transparentnost.'
+            self.fields[name].help_text = 'AVIF do 80 KB po slici, preporučeno 1600 × 600 px. Čuva se najbolji kvalitet koji stane u limit, uz očuvanu transparentnost.'
 
     def clean(self):
         data = super().clean()

@@ -66,6 +66,8 @@ def owner_required(view):
 @sensitive_post_parameters('password')
 @require_http_methods(['GET', 'POST'])
 def login(request):
+    if not ControlState.objects.get(pk=1).initialized_at:
+        return redirect('bera_control:setup')
     if authenticated(request):
         return redirect('bera_control:dashboard')
     state = ControlState.objects.get(pk=1)
@@ -109,7 +111,9 @@ def setup(request):
             initialize(form.cleaned_data['token'], form.cleaned_data['password'], address(request))
         except PermissionDenied:
             AuditEvent.objects.create(action='bootstrap_rejected', address=address(request))
-            raise
+            form.add_error('token', 'Token nije važeći, istekao je ili je zamijenjen novim. Generišite novi token i unesite ga ovdje, ne u polje lozinke za prijavu.')
+            return render(request, 'bera_control/auth.html', {'form': form, 'title': 'Sigurno prvo postavljanje', 'setup': True}, status=403)
+        messages.success(request, 'Lozinka je postavljena. Sada se prijavite svojom novom lozinkom, ne bootstrap tokenom.')
         return redirect('bera_control:login')
     return render(request, 'bera_control/auth.html', {'form': form, 'title': 'Sigurno prvo postavljanje', 'setup': True})
 

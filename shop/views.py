@@ -373,14 +373,15 @@ def home(request, category_pk=None, sale_only=False, new_only=False, bestselling
             return redirect(target)
 
     from .chatbot import public_config
-    banners = {b.position: b for b in Banner.objects.filter(is_active=True)}
+    all_banners = list(Banner.objects.all().order_by('pk'))
+    banners = {b.position: b for b in all_banners if b.is_active}
     return render(request, 'shop/home.html', {
         'storefront_version': max((settings.BASE_DIR / 'shop/static' / name).stat().st_mtime_ns for name in ['css/home.css', 'css/bera-home.css', 'home.js']),
         'site_settings': StoreSettings.objects.filter(pk=1).first(),
-        'banner': data.get('banner') if not Banner.objects.filter(position='hero').exists() else None,
+        'banner': data.get('banner') if not any(b.position == 'hero' for b in all_banners) else None,
         'chatbot_settings': public_config(),
         'chatbot_version': max((settings.BASE_DIR / 'shop/static' / name).stat().st_mtime_ns for name in ['chatbot.js', 'css/chatbot.css']),
-        'hero_banners': Banner.objects.filter(position='hero', is_active=True).order_by('pk'),
+        'hero_banners': [b for b in all_banners if b.position == 'hero' and b.is_active],
         'offer_left': banners.get('offer_left'),
         'offer_right': banners.get('offer_right'),
         'footer_promo_card': banners.get('footer'),

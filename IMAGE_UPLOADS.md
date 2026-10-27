@@ -51,14 +51,14 @@ produkcijska migracija ili prerada postojećih slika.
 Pillow opcije:
 https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
 
-## Svi banneri na početnoj — 80 KB po slici
+## Svi banneri — samo AVIF, do 80 KB po slici
 
-Sve pozicije (hero, middle, offer_left, offer_right, footer), obje slike:
-najviše 80.000 bajtova i do 1600 px po dužoj strani. Jedan brz AVIF pokušaj;
-WebP fallback isprobava kvalitet 85/65/45 na istoj rezoluciji prije smanjivanja
-rezolucije. Broj pokušaja ostaje ograničen. Transparentnost se čuva.
-Profil je isti u formi i direktnom spremanju modela; nema dvostruke obrade.
-Limit važi po datoteci, ne za zbir svih bannera. Visoko detaljne slike mogu
-zahtijevati manju rezoluciju da bi stale u 80 KB.
-Postojeće slike nisu prepravljene: ponovo uploadovati originale za novi limit.
-Nema nove migracije ili promjene HTML/CSS i Gunicorn timeouta.
+Sve pozicije i obje slike bannera spremaju se kao .avif / image/avif do
+80.000 bajtova, najviše 1600 px. Kvalitet 80, 65, 50 pokušava se na istoj
+rezoluciji; samo posljednji pokušaj smanjuje dimenzije i koristi kvalitet 45.
+Najviše četiri AVIF enkodiranja, uvijek speed=10, max_threads=1. Nema ponovne
+obrade pri spremanju modela. Transparentnost i omjer stranica se čuvaju.
+Ako AVIF encoder nije dostupan/ne radi ili nijedan pokušaj ne stane u limit,
+forma vraća grešku; ne sprema drugi format ili prevelik fajl.
+Originalni kvalitet nije moguće garantovati unutar 80 KB za proizvoljnu sliku.
+Postojeće datoteke nisu mijenjane: ponovo uploadovati originalni banner.
