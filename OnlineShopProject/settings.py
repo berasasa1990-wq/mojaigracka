@@ -242,6 +242,9 @@ LOGGING = {
         'console': {'class': 'logging.StreamHandler'},
     },
     'loggers': {
+        'shop.image_uploads': {
+            'handlers': ['console'], 'level': 'INFO', 'propagate': False,
+        },
         'django': {
             'handlers': ['console'],
             'level': 'INFO',

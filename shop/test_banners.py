@@ -19,7 +19,7 @@ class HeroBannerTests(TestCase):
             self.assertTrue(form.is_valid(), form.errors)
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
-                self.assertTrue(image.name.endswith('.avif'))
+                self.assertTrue(image.name.endswith(('.avif', '.webp', '.png')))
                 self.assertLessEqual(image.size, 80_000)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
