@@ -103,3 +103,13 @@ Originalni kvalitet za svaku sliku nije moguć uz 30 KB; složene slike mogu ima
 manju rezoluciju. Transparentnost se čuva, MIME i ekstenzija odgovaraju formatu.
 Promjena važi za nove uploadove; postojeće datoteke nisu izmijenjene.
 39 relevantnih testova prolazi; check i provjera migracija prolaze.
+
+## Aktuelni banner profil: čistija slika do 100 KB
+
+Banneri sada imaju do 100.000 bajtova i 1920 px; samo AVIF. Najviše tri pokušaja
+quality=85/75/65, speed=10, max_threads=1, pri istoj pripremljenoj rezoluciji.
+Nema više pada na quality 50/45 niti dodatnog smanjivanja dimenzija radi limita.
+Ako ne stane pri ovom kvalitetu, forma vraća grešku umjesto zamagljenog rezultata.
+Ovo zamjenjuje prethodni limit bannera 80 KB. Artikli ostaju do 30 KB.
+Za veći kvalitet postojećeg bannera ponovo uploadovati originalnu datoteku.
+28 testova bannera/uploadova prolazi; check i provjera migracija prolaze.

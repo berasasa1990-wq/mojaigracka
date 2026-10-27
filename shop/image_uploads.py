@@ -21,7 +21,7 @@ MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_FALLBACK_ATTEMPTS = 8
 BANNER_IMAGE_OPTIONS = {
-    "max_bytes": 80_000, "max_side": 1600, "prefer_webp": False, "quality": None,
+    "max_bytes": 100_000, "max_side": 1920, "prefer_webp": False, "quality": None,
 }
 FORMAT_DETAILS = {'AVIF': ('.avif', 'image/avif'), 'WEBP': ('.webp', 'image/webp'),
                   'PNG': ('.png', 'image/png')}
@@ -84,12 +84,12 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
                     image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
 
-        # All banner fields require AVIF. Bound work to four fast encodes;
-        # keep resolution for the first three, resize only as a last resort.
-        if max_bytes == 80_000:
+        # All banner fields require AVIF. Bound work to three fast encodes;
+        # preserve resolution and reject rather than silently blur the artwork.
+        if max_bytes == 100_000:
             if not features.check('avif'):
                 raise ValidationError('AVIF obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
-            for banner_quality in (80, 65, 50, 45):
+            for banner_quality in (85, 75, 65):
                 attempts += 1
                 try:
                     data = _encode(image, 'AVIF', quality=banner_quality, speed=10, max_threads=1)
@@ -99,10 +99,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     raise ValidationError('AVIF obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
                 if len(data) <= max_bytes:
                     return finish(data, 'AVIF')
-                if banner_quality == 50:
-                    scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
-                    image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
-            raise ValidationError('Banner ne stane u 80 KB. Odaberite sliku manje rezolucije ili s manje detalja.')
+            raise ValidationError('Banner ne stane u 100 KB uz visoki kvalitet. Pripremite jednostavniju sliku ili nešto manju rezoluciju; kvalitet nije dodatno snižen.')
 
         # Preserve logo edges/alpha losslessly if a cheap PNG already fits.
         if prefer_webp:

@@ -58,7 +58,7 @@ class ImageUploadTests(TestCase):
                     setattr(instance, field, upload())
                     instance.save()
                     file = getattr(instance, field)
-                    self.assert_optimized(file, 80_000 if isinstance(instance, Banner) else 1_000_000)
+                    self.assert_optimized(file, 100_000 if isinstance(instance, Banner) else 1_000_000)
                     name = file.name
                     file.close()
                     instance.save()

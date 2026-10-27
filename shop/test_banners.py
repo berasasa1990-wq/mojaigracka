@@ -20,7 +20,7 @@ class HeroBannerTests(TestCase):
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
                 self.assertTrue(image.name.endswith('.avif'))
-                self.assertLessEqual(image.size, 80_000)
+                self.assertLessEqual(image.size, 100_000)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
                 self.assertContains(response, text)
@@ -36,7 +36,7 @@ class HeroBannerTests(TestCase):
             form = BannerForm({'position': 'middle', 'title': 'Veliki banner', 'is_active': 'on'}, {'image': upload(artwork)})
             self.assertTrue(form.is_valid(), form.errors)
             banner = form.save()
-            self.assertLessEqual(banner.image.size, 80_000)
+            self.assertLessEqual(banner.image.size, 100_000)
             self.assertGreater(banner.image.size, 15_000)
             with Image.open(banner.image) as image:
                 self.assertEqual(image.size, artwork.size)
@@ -110,7 +110,7 @@ class HeroBannerTests(TestCase):
         from unittest.mock import patch
         from . import image_uploads
 
-        artwork = Image.effect_noise((1920, 720), 40).convert('RGB')
+        artwork = Image.linear_gradient('L').resize((1920, 720)).convert('RGB')
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media), patch(
                 'shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
             form = BannerForm({'position': 'hero', 'title': 'HD banner', 'is_active': 'on'},
@@ -119,10 +119,10 @@ class HeroBannerTests(TestCase):
             attempts = encode.call_count
             banner = form.save()
             self.assertEqual(encode.call_count, attempts)
-            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 4)
-            self.assertLessEqual(banner.image.size, 80_000)
+            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 3)
+            self.assertLessEqual(banner.image.size, 100_000)
             with banner.image.open('rb') as file, Image.open(file) as image:
-                self.assertLessEqual(max(image.size), 1600)
+                self.assertLessEqual(max(image.size), 1920)
 
     def test_direct_hero_upload_uses_high_quality_policy(self):
         from PIL import Image
@@ -131,11 +131,11 @@ class HeroBannerTests(TestCase):
             banner = Banner.objects.create(position='hero', title='Direct',
                                            image=upload(Image.new('RGBA', (1920, 720), (20, 50, 80, 120))))
             with banner.image.open('rb') as file, Image.open(file) as image:
-                self.assertLessEqual(max(image.size), 1600)
+                self.assertLessEqual(max(image.size), 1920)
                 self.assertEqual(image.getpixel((0, 0))[3], 120)
 
 
-    def test_every_banner_position_limits_both_images_to_80kb(self):
+    def test_every_banner_position_limits_both_images_to_100kb(self):
         from PIL import Image
 
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
@@ -149,7 +149,7 @@ class HeroBannerTests(TestCase):
                     banner = form.save()
                     for name in ('image', 'secondary_image'):
                         stored = getattr(banner, name)
-                        self.assertLessEqual(stored.size, 80_000)
+                        self.assertLessEqual(stored.size, 100_000)
                         self.assertTrue(stored.name.endswith('.avif'))
                         with stored.open('rb') as file, Image.open(file) as image:
                             self.assertEqual(image.format, 'AVIF')
@@ -166,3 +166,18 @@ class HeroBannerTests(TestCase):
             self.assertIn('image', form.errors)
         banner.refresh_from_db()
         self.assertEqual(banner.image.name, original_name)
+
+
+    def test_banner_does_not_silently_lower_quality_or_resolution_to_fit(self):
+        from PIL import Image
+        from unittest.mock import patch
+
+        with patch('shop.image_uploads._encode', return_value=b'x' * 100_001) as encode:
+            form = BannerForm({'position': 'hero', 'title': 'Detailed'},
+                              {'image': upload(Image.new('RGB', (1920, 720), 'red'))})
+            self.assertFalse(form.is_valid())
+            self.assertIn('image', form.errors)
+            self.assertEqual(encode.call_count, 3)
+            for call in encode.call_args_list:
+                self.assertEqual(call.args[0].size, (1920, 720))
+                self.assertGreaterEqual(call.kwargs['quality'], 65)
