@@ -104,3 +104,16 @@ continue to forbid SQLite. No push, deployment or local migration occurred.
 Existing unrelated local modifications and untracked application/migration files
 were preserved. Include all intended application files in the reviewed commit
 before deploying; do not commit local secrets, SQLite, media or staticfiles.
+
+## Diagnosing HTTP 500 after first deploy
+
+Django tracebacks now go to stderr/Render application logs even with DEBUG=false.
+The SQLite-only hourly backup worker is skipped on PostgreSQL; use PostgreSQL
+backups supplied by the database provider. A backup-thread exception by itself
+is not the traceback of an HTTP request.
+
+On the first release, inspect `python manage.py showmigrations --plan` in Render
+Shell. If the new Mojaigracka database has pending migrations, review them and
+run `python manage.py migrate` manually. Do not add migrations to the build
+command. A `relation ... does not exist` request traceback indicates missing
+tables/migrations; other exceptions need their own diagnosis. Keep DEBUG=false.

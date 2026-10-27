@@ -222,3 +222,19 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '').lower() in ('1', 'true', 'ye
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', '').lower() in ('1', 'true', 'yes')
 EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'webmaster@localhost')
+
+# Send server-side tracebacks to Render application logs with DEBUG disabled.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

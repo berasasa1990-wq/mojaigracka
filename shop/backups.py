@@ -113,6 +113,10 @@ def restore_backup(name):
 
 def start_backup_worker():
     global _started
+    config = settings.DATABASES['default']
+    if config['ENGINE'] != 'django.db.backends.sqlite3' or str(config['NAME']) == ':memory:':
+        logger.info('SQLite backup worker disabled for this database backend.')
+        return
     with _start_lock:
         if _started:
             return

@@ -60,3 +60,19 @@ class BackupTests(SimpleTestCase):
             self.assertTrue(recent.exists())
             self.assertTrue(boundary.exists())
             self.assertTrue(unrelated.exists())
+
+
+class BackupWorkerBackendTests(SimpleTestCase):
+    def test_postgresql_does_not_start_sqlite_worker(self):
+        config = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': 'shop'}}
+        with override_settings(DATABASES=config), patch.object(backups.threading, 'Thread') as thread:
+            backups.start_backup_worker()
+        thread.assert_not_called()
+
+    def test_sqlite_on_disk_starts_worker(self):
+        config = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': '/tmp/shop.sqlite3'}}
+        with override_settings(DATABASES=config), patch.object(backups, '_started', False), patch.object(backups.threading, 'Thread') as thread:
+            backups.start_backup_worker()
+            backups.start_backup_worker()
+        thread.assert_called_once()
+        thread.return_value.start.assert_called_once()
