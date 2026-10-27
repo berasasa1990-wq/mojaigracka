@@ -140,3 +140,13 @@ Keep the existing Gunicorn Start Command. This is a temporary operator-controlle
 step, not automatic migration on every build. No local SQLite data is transferred
 by migrate. If HTTP 500 persists, inspect its request traceback rather than
 assuming the schema is the only cause.
+
+## Activate this project's local environment
+
+From the MojaIgracka root, run `source ./dev.sh` in each new terminal.
+This selects this project's venv, enables development mode, and unsets
+DATABASE_URL so local commands use this project's SQLite only. It does not
+connect to Render or another project. Then run `python manage.py createsuperuser`
+interactively if a LOCAL admin account is needed. The VS Code workspace defaults
+to venv/bin/python. Virtual environments should be recreated after moving a
+project; do not commit the venv directory.
