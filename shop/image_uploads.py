@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_FALLBACK_ATTEMPTS = 8
-HERO_IMAGE_OPTIONS = {
-    "max_bytes": 1_000_000, "max_side": 1920, "prefer_webp": True, "quality": 90,
+BANNER_IMAGE_OPTIONS = {
+    "max_bytes": 80_000, "max_side": 1600, "prefer_webp": False, "quality": None,
 }
 FORMAT_DETAILS = {'AVIF': ('.avif', 'image/avif'), 'WEBP': ('.webp', 'image/webp'),
                   'PNG': ('.png', 'image/png')}
@@ -93,7 +93,8 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             attempts += 1
             try:
                 if fallback_format == 'WEBP':
-                    data = _encode(image, 'WEBP', quality=max(35, (quality or 85) - attempt * 10),
+                    data = _encode(image, 'WEBP', quality=(max(45, (quality or 85) - attempt * 20) if max_bytes == 80_000
+                                            else max(35, (quality or 85) - attempt * 10)),
                                    method=0, alpha_quality=100, exact=True)
                 else:
                     data = _encode(image, 'PNG', compress_level=3)
@@ -107,7 +108,11 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                 data = _encode(image, 'PNG', compress_level=3)
             if len(data) <= max_bytes:
                 return finish(data, fallback_format)
-            image = image.resize(tuple(max(1, int(n * .6)) for n in image.size), Image.Resampling.LANCZOS)
+            # Try several WebP qualities at full banner resolution before resizing.
+            if max_bytes == 80_000 and fallback_format == 'WEBP' and attempt < 2:
+                continue
+            scale = .75 if max_bytes == 80_000 and fallback_format == 'WEBP' else .6
+            image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
         raise ValidationError(f'Slika se ne može smanjiti na {max_bytes // 1000} KB. Odaberite drugu sliku.')
     except (UnidentifiedImageError, OSError, ValueError, RuntimeError,
             Image.DecompressionBombError, Image.DecompressionBombWarning):
@@ -155,9 +160,8 @@ class AVIFFileField(models.FileField):
         })
 
     def optimization_options(self, instance=None):
-        if (instance is not None and instance._meta.label_lower == 'shop.banner'
-                and instance.position == 'hero'):
-            return dict(HERO_IMAGE_OPTIONS)
+        if (instance is not None and instance._meta.label_lower == 'shop.banner'):
+            return dict(BANNER_IMAGE_OPTIONS)
         return {'prefer_webp': self.name == 'logo',
                 'max_side': 512 if self.name == 'logo' else (1280 if self.max_bytes > MAX_IMAGE_BYTES else 960)}
 

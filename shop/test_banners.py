@@ -20,7 +20,7 @@ class HeroBannerTests(TestCase):
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
                 self.assertTrue(image.name.endswith(('.avif', '.webp', '.png')))
-                self.assertLessEqual(image.size, 1_000_000)
+                self.assertLessEqual(image.size, 80_000)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
                 self.assertContains(response, text)
@@ -119,11 +119,10 @@ class HeroBannerTests(TestCase):
             attempts = encode.call_count
             banner = form.save()
             self.assertEqual(encode.call_count, attempts)
-            self.assertFalse(any(call.args[1] == 'AVIF' for call in encode.call_args_list))
-            self.assertLessEqual(banner.image.size, 1_000_000)
-            self.assertGreater(banner.image.size, 80_000)
+            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 1)
+            self.assertLessEqual(banner.image.size, 80_000)
             with banner.image.open('rb') as file, Image.open(file) as image:
-                self.assertEqual(image.size, (1920, 720))
+                self.assertLessEqual(max(image.size), 1600)
 
     def test_direct_hero_upload_uses_high_quality_policy(self):
         from PIL import Image
@@ -132,5 +131,21 @@ class HeroBannerTests(TestCase):
             banner = Banner.objects.create(position='hero', title='Direct',
                                            image=upload(Image.new('RGBA', (1920, 720), (20, 50, 80, 120))))
             with banner.image.open('rb') as file, Image.open(file) as image:
-                self.assertEqual(image.size, (1920, 720))
+                self.assertLessEqual(max(image.size), 1600)
                 self.assertEqual(image.getpixel((0, 0))[3], 120)
+
+
+    def test_every_banner_position_limits_both_images_to_80kb(self):
+        from PIL import Image
+
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            for position, _ in Banner.POSITION_CHOICES:
+                with self.subTest(position=position):
+                    instance = Banner.objects.filter(position=position).first() or Banner(position=position)
+                    form = BannerForm({'position': position, 'title': 'Banner', 'is_active': 'on'},
+                                      {'image': upload(Image.new('RGB', (1600, 600), 'red')),
+                                       'secondary_image': upload()}, instance=instance)
+                    self.assertTrue(form.is_valid(), form.errors)
+                    banner = form.save()
+                    for name in ('image', 'secondary_image'):
+                        self.assertLessEqual(getattr(banner, name).size, 80_000)

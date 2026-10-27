@@ -8,7 +8,7 @@ Postojeće spremljene slike se ne obrađuju pri običnom save() bez novog upload
 
 - Logo trgovine i brendova: najviše 512 px po dužoj strani, prvo brz PNG
   (compress_level=3), zatim WebP ako PNG ne stane. AVIF se ne pokreće za logo.
-- Slike artikala/kategorija: najviše 960 px. Banneri: najviše 1280 px.
+- Slike artikala/kategorija: najviše 960 px. Banneri: najviše 1600 px.
 - Male i RGBA slike koriste WebP (method=0, alpha_quality=100, exact=True).
 - Veće RGB slike: najviše JEDAN AVIF pokušaj, quality=55, speed=10,
   max_threads=1. Pillow 12.3.0 podržava ove opcije.
@@ -51,11 +51,14 @@ produkcijska migracija ili prerada postojećih slika.
 Pillow opcije:
 https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
 
-## Glavni banner — viši kvalitet
+## Svi banneri na početnoj — 80 KB po slici
 
-Glavni banner (position=hero), obje slike: do 1920 px i 1.000.000 bajtova,
-prvo PNG bez gubitaka ako stane, inače WebP quality=90/method=0. AVIF se ne
-pokreće. Profil važi za BannerForm i direktno spremanje modela; rezultat forme
-ne obrađuje se ponovo. Ostali banneri ostaju na 80 KB / 1280 px.
-Postojeće slike se ne prepravljaju: ponovo uploadovati ORIGINAL glavnog bannera
-da bi se vidjelo poboljšanje. Nema nove migracije, promjene HTML/CSS ili timeouta.
+Sve pozicije (hero, middle, offer_left, offer_right, footer), obje slike:
+najviše 80.000 bajtova i do 1600 px po dužoj strani. Jedan brz AVIF pokušaj;
+WebP fallback isprobava kvalitet 85/65/45 na istoj rezoluciji prije smanjivanja
+rezolucije. Broj pokušaja ostaje ograničen. Transparentnost se čuva.
+Profil je isti u formi i direktnom spremanju modela; nema dvostruke obrade.
+Limit važi po datoteci, ne za zbir svih bannera. Visoko detaljne slike mogu
+zahtijevati manju rezoluciju da bi stale u 80 KB.
+Postojeće slike nisu prepravljene: ponovo uploadovati originale za novi limit.
+Nema nove migracije ili promjene HTML/CSS i Gunicorn timeouta.
