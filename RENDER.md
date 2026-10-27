@@ -114,6 +114,29 @@ is not the traceback of an HTTP request.
 
 On the first release, inspect `python manage.py showmigrations --plan` in Render
 Shell. If the new Mojaigracka database has pending migrations, review them and
-run `python manage.py migrate` manually. Do not add migrations to the build
-command. A `relation ... does not exist` request traceback indicates missing
+run `python manage.py migrate` manually. Do not leave migrations in the regular build
+command. For a one-time free-plan setup without Shell, see below. A `relation ... does not exist` request traceback indicates missing
 tables/migrations; other exceptions need their own diagnosis. Keep DEBUG=false.
+
+## Free plan: one-time migration without Shell
+
+For the first setup of the dedicated Mojaigracka PostgreSQL database only, use
+this temporary Build Command in the Render dashboard:
+
+```sh
+python -m pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+```
+
+Review the database target and pending migrations first. For an existing database,
+take a backup before applying changes. Trigger the deploy manually. Verify the
+build log contains successful migration results and test the homepage. Afterwards
+restore the regular Build Command immediately:
+
+```sh
+python -m pip install -r requirements.txt && python manage.py collectstatic --noinput
+```
+
+Keep the existing Gunicorn Start Command. This is a temporary operator-controlled
+step, not automatic migration on every build. No local SQLite data is transferred
+by migrate. If HTTP 500 persists, inspect its request traceback rather than
+assuming the schema is the only cause.
