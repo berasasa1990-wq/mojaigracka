@@ -23,9 +23,9 @@ def upload(image=None, format='PNG'):
 
 
 class ImageUploadTests(TestCase):
-    def assert_optimized(self, file):
+    def assert_optimized(self, file, max_bytes=MAX_IMAGE_BYTES):
         self.assertTrue(file.name.endswith(('.avif', '.webp', '.png')))
-        self.assertLessEqual(file.size, MAX_IMAGE_BYTES)
+        self.assertLessEqual(file.size, max_bytes)
         file.seek(0)
         with Image.open(file) as image:
             self.assertEqual({'.avif': 'AVIF', '.webp': 'WEBP', '.png': 'PNG'}[Path(file.name).suffix], image.format)
@@ -58,7 +58,7 @@ class ImageUploadTests(TestCase):
                     setattr(instance, field, upload())
                     instance.save()
                     file = getattr(instance, field)
-                    self.assert_optimized(file)
+                    self.assert_optimized(file, 80_000 if isinstance(instance, Banner) else 1_000_000)
                     name = file.name
                     file.close()
                     instance.save()
@@ -67,10 +67,10 @@ class ImageUploadTests(TestCase):
     def test_forms_convert_uploads_and_accept_avif(self):
         for form in (BrandForm({'name': 'Test'}, {'logo': upload()}), LogoForm({}, {'logo': upload()})):
             self.assertTrue(form.is_valid(), form.errors)
-            self.assert_optimized(form.cleaned_data['logo'])
+            self.assert_optimized(form.cleaned_data['logo'], 1_000_000)
         form = LogoForm({}, {'logo': upload(format='AVIF')})
         self.assertTrue(form.is_valid(), form.errors)
-        self.assert_optimized(form.cleaned_data['logo'])
+        self.assert_optimized(form.cleaned_data['logo'], 1_000_000)
 
     def test_invalid_file_is_a_form_error(self):
         form = BrandForm({'name': 'Test'}, {'logo': SimpleUploadedFile('fake.png', b'not an image')})
@@ -109,7 +109,7 @@ class ImageUploadTests(TestCase):
             self.assertEqual(encode.call_args.kwargs['speed'], 10)
             self.assertEqual(encode.call_args.kwargs['max_threads'], 1)
             with product.image.open('rb') as file, Image.open(file) as image:
-                self.assertLessEqual(max(image.size), 960)
+                self.assertEqual(image.size, (1400, 900))
 
     def test_avif_error_falls_back_with_correct_extension_mime_and_bounded_work(self):
         original = image_uploads._encode
@@ -165,3 +165,32 @@ class ImageUploadTests(TestCase):
             self.assertIs(optimize_image(result), result)
         opened.assert_not_called()
         encode.assert_not_called()
+
+
+    def test_detailed_product_stays_under_30kb_with_bounded_avif_work(self):
+        artwork = Image.effect_noise((1600, 1000), 45).convert('RGB')
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media), patch(
+                'shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
+            product = Product.objects.create(name='Detailed', price=10, image=upload(artwork))
+            self.assertLessEqual(product.image.size, 30_000)
+            self.assertEqual(encode.call_args_list[0].kwargs['quality'], 80)
+            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 4)
+            with product.image.open('rb') as file, Image.open(file) as image:
+                self.assertLessEqual(max(image.size), 1600)
+                self.assertAlmostEqual(image.width / image.height, 1.6, delta=.01)
+
+    def test_quality_profile_rejects_oversize_output_instead_of_destroying_detail(self):
+        with patch('shop.image_uploads._encode', return_value=b'x' * 1_000_001):
+            form = LogoForm({}, {'logo': upload()})
+            self.assertFalse(form.is_valid())
+            self.assertIn('logo', form.errors)
+
+
+    def test_transparent_product_is_under_30kb_and_keeps_alpha(self):
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            product = Product.objects.create(name='Transparent', price=10, image=upload())
+            self.assertLessEqual(product.image.size, 30_000)
+            with product.image.open('rb') as file, Image.open(file) as image:
+                self.assertEqual(image.size, (300, 150))
+                self.assertEqual(image.mode, 'RGBA')
+                self.assertEqual(image.getpixel((0, 0))[3], 120)

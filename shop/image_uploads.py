@@ -33,10 +33,10 @@ def _encode(image, format, **options):
     return output.getvalue()
 
 
-def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None):
+def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False):
     """Bound encoder work; banners use AVIF only, other images allow fallback."""
     max_side = max_side or (1280 if max_bytes > MAX_IMAGE_BYTES else 960)
-    policy = (max_bytes, max_side, prefer_webp, quality)
+    policy = (max_bytes, max_side, prefer_webp, quality, preserve_quality)
     if getattr(upload, '_optimized_image', None) == policy and upload.size <= max_bytes:
         return upload
     started = time.monotonic()
@@ -68,6 +68,22 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             outcome, result_format = 'ok', format
             return result
 
+        if max_bytes == 30_000 and features.check('avif'):
+            # Prefer AVIF's compression for product detail, with bounded CPU work.
+            for product_quality in (80, 65, 50, 45):
+                attempts += 1
+                try:
+                    data = _encode(image, 'AVIF', quality=product_quality, speed=10, max_threads=1)
+                except (OSError, ValueError, RuntimeError):
+                    logger.warning('image_encode product_avif_failed elapsed_ms=%.1f fallback=webp_or_png',
+                                   (time.monotonic() - started) * 1000)
+                    break
+                if len(data) <= max_bytes:
+                    return finish(data, 'AVIF')
+                if product_quality in (50, 45):
+                    scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
+                    image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
+
         # All banner fields require AVIF. Bound work to four fast encodes;
         # keep resolution for the first three, resize only as a last resort.
         if max_bytes == 80_000:
@@ -97,7 +113,7 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
 
         # Pillow 12.3 supports AVIF speed=10 (fastest). Avoid it for logos,
         # alpha artwork and small images; no repeated AVIF quality search.
-        if not prefer_webp and image.mode == 'RGB' and max(image.size) > 512 and features.check('avif'):
+        if max_bytes != 30_000 and not prefer_webp and image.mode == 'RGB' and max(image.size) > 512 and features.check('avif'):
             attempts += 1
             try:
                 data = _encode(image, 'AVIF', quality=quality or 55, speed=10, max_threads=1)
@@ -107,6 +123,26 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                 # No filenames, request data, credentials or provider errors.
                 logger.warning('image_encode avif_failed elapsed_ms=%.1f fallback=webp_or_png',
                                (time.monotonic() - started) * 1000)
+
+        if preserve_quality:
+            # Never crush detail to meet the old 15 KB budget. Keep the decoded
+            # resolution and high quality; reject rather than silently pixelate.
+            attempts += 1
+            try:
+                if features.check('webp'):
+                    data = _encode(image, 'WEBP', quality=90, method=0,
+                                   alpha_quality=100, exact=True)
+                    format = 'WEBP'
+                else:
+                    data = _encode(image, 'PNG', compress_level=3)
+                    format = 'PNG'
+            except (OSError, ValueError, RuntimeError):
+                attempts += 1
+                data = _encode(image, 'PNG', compress_level=3)
+                format = 'PNG'
+            if len(data) <= max_bytes:
+                return finish(data, format)
+            raise ValidationError('Slika ne stane u 1 MB uz visoki kvalitet. Odaberite manje složenu sliku; kvalitet nije automatski snižen.')
 
         fallback_format = 'WEBP' if features.check('webp') else 'PNG'
         for attempt in range(MAX_FALLBACK_ATTEMPTS):
@@ -139,18 +175,19 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
 
 
 class AVIFUploadFormField(forms.FileField):
-    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, quality=None, **kwargs):
+    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, quality=None, preserve_quality=False, **kwargs):
         self.max_bytes = max_bytes
         self.max_side = max_side
         self.prefer_webp = prefer_webp
         self.quality = quality
+        self.preserve_quality = preserve_quality
         super().__init__(*args, **kwargs)
         self.widget.attrs['accept'] = 'image/png,image/jpeg,image/webp,image/gif,image/avif'
 
     def clean(self, data, initial=None):
         value = super().clean(data, initial)
         if value and value is not initial:
-            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp, quality=self.quality)
+            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp, quality=self.quality, preserve_quality=self.preserve_quality)
         return value
 
 
@@ -170,15 +207,18 @@ class AVIFFileField(models.FileField):
         return super().formfield(**{
             'form_class': AVIFUploadFormField, 'max_bytes': self.max_bytes,
             **self.optimization_options(),
-            'help_text': f'Slika se optimizuje do {self.max_bytes // 1000} KB kao PNG, WebP ili AVIF. Animacije koriste prvu sliku.',
+            'help_text': f'Slika do {self.optimization_options().get("max_bytes", self.max_bytes) // 1000} KB, uz očuvanje detalja i transparentnosti. Animacije koriste prvu sliku.',
             **kwargs,
         })
 
     def optimization_options(self, instance=None):
-        if (instance is not None and instance._meta.label_lower == 'shop.banner'):
+        if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) == 'shop.banner':
             return dict(BANNER_IMAGE_OPTIONS)
-        return {'prefer_webp': self.name == 'logo',
-                'max_side': 512 if self.name == 'logo' else (1280 if self.max_bytes > MAX_IMAGE_BYTES else 960)}
+        if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) == 'shop.product':
+            return {'max_bytes': 30_000, 'max_side': 1600, 'prefer_webp': False,
+                    'quality': 80, 'preserve_quality': False}
+        return {'max_bytes': 1_000_000, 'max_side': 1024 if self.name == 'logo' else 1920,
+                'prefer_webp': self.name == 'logo', 'quality': 85, 'preserve_quality': True}
 
     def pre_save(self, model_instance, add):
         file = getattr(model_instance, self.attname)

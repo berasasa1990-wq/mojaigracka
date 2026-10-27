@@ -62,3 +62,44 @@ Ako AVIF encoder nije dostupan/ne radi ili nijedan pokušaj ne stane u limit,
 forma vraća grešku; ne sprema drugi format ili prevelik fajl.
 Originalni kvalitet nije moguće garantovati unutar 80 KB za proizvoljnu sliku.
 Postojeće datoteke nisu mijenjane: ponovo uploadovati originalni banner.
+
+## Visoki kvalitet artikala i ostalih javnih slika
+
+Novi uploadovi u Product.image, Category.image, Brand.logo i StoreSettings.logo
+više ne koriste stari budžet 15 KB. Runtime profil je do 1.000.000 bajtova:
+slike do 1920 px, logotipi do 1024 px, bez povećavanja malih originala.
+Za veće RGB slike najviše jedan brz AVIF quality=85/speed=10/max_threads=1.
+Fallback je WebP quality=90 ili PNG, uz očuvanu alfa transparentnost. Ako izlaz
+ne stane, forma vraća grešku umjesto dodatnog rušenja kvaliteta/rezolucije.
+
+Kartica artikla, product detail i zoom koriste isti FieldFile.url pa dobijaju
+istu novu kvalitetnu datoteku. HTML/CSS i dimenzije prikaza nisu mijenjani.
+Banneri su odvojeni i ostaju isključivo AVIF do 80.000 bajtova po slici.
+SEO ImageField uploadovi već su čuvali originalne datoteke i nisu promijenjeni.
+
+MAX_IMAGE_BYTES i stari help_text u model metapodacima zadržani su za
+kompatibilnost migracija/generičkog helpera; runtime field/form politika koristi
+novi budžet i novi help tekst. Nije potrebna nova DB migracija.
+
+Originalni kvalitet bez gubitaka nije garantovan pri AVIF/WebP kompresiji ni
+smanjenju na 1920 px, ali nema više tihog smanjivanja artikala na veoma male
+rezolucije radi limita 15 KB. Već kompresovane postojeće slike se ne obrađuju;
+za vraćanje detalja ponovo uploadovati originalne fajlove.
+
+Provjere: 38 relevantnih testova prolazi (upload, banneri, R2 i share slika),
+uključujući detaljnu sliku 1600×1000 čija se rezolucija čuva, visok kvalitet u
+encoder opcijama i odbijanje prevelikog izlaza umjesto uništavanja detalja.
+check, makemigrations --check --dry-run i git diff --check prolaze.
+
+## Ažurirani limit samo za artikle: 30 KB
+
+Product.image sada ima poseban runtime limit 30.000 bajtova i do 1600 px;
+to zamjenjuje gornji profil 1 MB samo za artikle. Kategorije/logotipi zadržavaju
+svoj veći budžet, a banneri ostaju na 80 KB. Najviše četiri brza AVIF pokušaja
+(80/65/50/45, speed=10, jedna nit); prvo se zadržava rezolucija, zatim se po
+potrebi proporcionalno smanjuje. Ako AVIF ne uspije/ne stane, ostaje ograničen
+WebP/PNG fallback. Nema drugog obrađivanja rezultata forme pri spremanju modela.
+Originalni kvalitet za svaku sliku nije moguć uz 30 KB; složene slike mogu imati
+manju rezoluciju. Transparentnost se čuva, MIME i ekstenzija odgovaraju formatu.
+Promjena važi za nove uploadove; postojeće datoteke nisu izmijenjene.
+39 relevantnih testova prolazi; check i provjera migracija prolaze.
