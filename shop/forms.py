@@ -102,7 +102,7 @@ class BannerForm(forms.ModelForm):
         model = Banner
         fields = ['position', 'title', 'eyebrow', 'subtitle', 'button_text', 'features', 'image', 'secondary_image', 'url', 'is_active']
         widgets = {'title': forms.Textarea(attrs={'rows': 2})}
-        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Svi banneri: do 90 KB po slici, uz očuvanje kvaliteta koliko dozvoljava veličina fajla.'}
+        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Svi banneri: do 150 KB po slici, uz očuvanje kvaliteta koliko dozvoljava veličina fajla.'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,7 +110,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in BANNER_IMAGE_OPTIONS.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'AVIF do 90 KB po slici. Različiti omjeri i rezolucije automatski se prilagođavaju, uz visok kvalitet i očuvanu transparentnost. Preporučeno 1920 × 720 px.'
+            self.fields[name].help_text = 'AVIF do 150 KB po slici. Različiti omjeri i rezolucije automatski se prilagođavaju, uz visok kvalitet (AVIF 90) i očuvanu transparentnost. Preporučeno 1920 × 720 px.'
 
     def clean(self):
         data = super().clean()
