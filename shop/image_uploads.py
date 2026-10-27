@@ -211,7 +211,7 @@ class AVIFFileField(models.FileField):
     def optimization_options(self, instance=None):
         if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) == 'shop.banner':
             return dict(BANNER_IMAGE_OPTIONS)
-        if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) == 'shop.product':
+        if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) in ('shop.product', 'shop.productimage'):
             return {'max_bytes': 30_000, 'max_side': 1600, 'prefer_webp': False,
                     'quality': 80, 'preserve_quality': False}
         return {'max_bytes': 1_000_000, 'max_side': 1024 if self.name == 'logo' else 1920,

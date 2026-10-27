@@ -9,7 +9,7 @@ class LogoForm(forms.ModelForm):
 
 
 
-from .models import Brand, Category, Product, Banner
+from .models import Brand, Category, Product, ProductImage, Banner
 from django.core.validators import MinValueValidator
 
 
@@ -25,7 +25,62 @@ class CategoryForm(forms.ModelForm):
         fields = ['name', 'image', 'seo_title', 'seo_description']
 
 
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleProductImagesField(forms.FileField):
+    widget = MultipleImageInput(attrs={'accept': 'image/png,image/jpeg,image/webp,image/gif,image/avif'})
+
+    def clean(self, data, initial=None):
+        from .image_uploads import optimize_image
+        files = data if isinstance(data, (list, tuple)) else ([data] if data else [])
+        if len(files) > 6:
+            raise forms.ValidationError('Dodajte najviše 6 slika odjednom.')
+        return [optimize_image(super(MultipleProductImagesField, self).clean(file),
+                               max_bytes=30_000, max_side=1600, quality=80)
+                for file in files]
+
+
 class ProductForm(forms.ModelForm):
+    remove_images = forms.ModelMultipleChoiceField(queryset=ProductImage.objects.none(),
+        required=False, widget=forms.MultipleHiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields['remove_images'].queryset = self.instance.additional_images.all()
+
+    additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
+        help_text='Odaberite više slika, najviše 6 odjednom. Do 30 KB po slici; prikazuju se lijevo od glavne slike.')
+
+    @property
+    def gallery_images(self):
+        if not hasattr(self, '_gallery_images'):
+            self._gallery_images = list(self.instance.additional_images.all()) if self.instance.pk else []
+        return self._gallery_images
+
+    def save(self, commit=True):
+        from django.db import transaction
+        with transaction.atomic():
+            return super().save(commit=commit)
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        from .models import ProductImage
+        from django.db.models import Max
+        selected = self.cleaned_data.get('remove_images')
+        if selected is not None and not getattr(self, '_gallery_removed', False):
+            self.instance.additional_images.filter(pk__in=selected.values_list('pk', flat=True)).delete()
+            self._gallery_removed = True
+        files = self.cleaned_data.get('additional_images', [])
+        if files and not getattr(self, '_gallery_saved', False):
+            position = self.instance.additional_images.aggregate(last=Max('position'))['last']
+            start = position + 1 if position is not None else 0
+            for offset, file in enumerate(files):
+                ProductImage.objects.create(product=self.instance, image=file, position=start + offset)
+            self._gallery_saved = True
+
     class Meta:
         model = Product
         fields = ['name', 'image', 'description', 'price', 'original_price', 'brand', 'category', 'stock', 'is_out_of_stock', 'is_active', 'is_featured', 'seo_title', 'seo_description']

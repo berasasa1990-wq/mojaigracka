@@ -5,7 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import storages
 
 PUBLIC_IMAGE_FIELDS = {
-    'Brand': ('logo',), 'Category': ('image',), 'Product': ('image',),
+    'ProductImage': ('image',), 'Brand': ('logo',), 'Category': ('image',), 'Product': ('image',),
     'StoreSettings': ('logo',), 'Banner': ('image', 'secondary_image'),
     'SEOSettings': ('social_image', 'favicon'),
 }

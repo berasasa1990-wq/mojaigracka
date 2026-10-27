@@ -503,3 +503,19 @@ productShareButton?.addEventListener('click', async () => {
     window.prompt('Kopirajte link artikla:', url);
   }
 });
+
+// Product gallery: keep the large image and zoom dialog in sync.
+document.querySelectorAll('[data-product-image]').forEach(button => {
+  button.addEventListener('click', () => {
+    const main = document.querySelector('[data-product-main-image]');
+    const zoom = document.querySelector('[data-product-zoom-image]');
+    if (!main) return;
+    main.src = button.dataset.productImage;
+    if (zoom) zoom.src = button.dataset.productImage;
+    document.querySelectorAll('[data-product-image]').forEach(item => {
+      const active = item === button;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-pressed', String(active));
+    });
+  });
+});

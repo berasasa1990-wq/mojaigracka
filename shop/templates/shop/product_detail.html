@@ -8,9 +8,14 @@
 <main class="product-detail-page">
   <nav class="product-breadcrumb" aria-label="Putanja"><a href="{% url 'home' %}">Početna</a><span>/</span>{% if product.category %}<a href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a><span>/</span>{% endif %}<span aria-current="page">{{ product.name }}</span></nav>
   <article class="product-detail">
-    <div class="product-detail-gallery">
-      <div class="product-card-toolbar">{% if product.has_article_plus %}<span class="product-badge">Ponuda +</span>{% elif product.has_bundle_sale %}<span class="product-badge">Bundle set</span>{% elif product.has_quantity_sale %}<span class="product-badge">Količinsko sniženje</span>{% elif product.original_price > product.price %}<span class="product-badge">-{{ product.discount_percent }}%</span>{% endif %}<button type="button" class="product-heart" aria-label="Dodaj na listu želja: {{ product.name }}" aria-pressed="false" data-wishlist-id="{{ product.pk }}" data-product-name="{{ product.name }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 21-8.8-8.5a5.6 5.6 0 0 1 7.9-7.9l.9.9.9-.9a5.6 5.6 0 0 1 7.9 7.9z"/></svg></button></div>
-      <div class="product-detail-photo">{% if product.image %}<img src="{{ product.image.url }}" alt="{{ product.name }}" width="640" height="540" fetchpriority="high"><button type="button" class="product-zoom-open" data-product-zoom aria-label="Povećaj sliku proizvoda" title="Povećaj sliku" aria-haspopup="dialog" aria-controls="productZoomDialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6M10 7v6M7 10h6"/></svg></button>{% else %}<p>Slika nije dodana.</p>{% endif %}</div>
+    <div class="product-image-layout{% if product_gallery|length > 1 %} has-thumbnails{% endif %}">
+      {% if product_gallery|length > 1 %}<nav class="product-thumbnails" aria-label="Slike artikla">
+          {% for photo in product_gallery %}<button type="button" class="product-thumbnail{% if forloop.first %} is-active{% endif %}" data-product-image="{{ photo.url }}" aria-label="Prikaži sliku {{ forloop.counter }}: {{ product.name }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"><img src="{{ photo.url }}" alt="" width="64" height="64" loading="lazy"></button>{% endfor %}
+        </nav>{% endif %}
+      <div class="product-detail-gallery">
+        <div class="product-card-toolbar">{% if product.has_article_plus %}<span class="product-badge">Ponuda +</span>{% elif product.has_bundle_sale %}<span class="product-badge">Bundle set</span>{% elif product.has_quantity_sale %}<span class="product-badge">Količinsko sniženje</span>{% elif product.original_price > product.price %}<span class="product-badge">-{{ product.discount_percent }}%</span>{% endif %}<button type="button" class="product-heart" aria-label="Dodaj na listu želja: {{ product.name }}" aria-pressed="false" data-wishlist-id="{{ product.pk }}" data-product-name="{{ product.name }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 21-8.8-8.5a5.6 5.6 0 0 1 7.9-7.9l.9.9.9-.9a5.6 5.6 0 0 1 7.9 7.9z"/></svg></button></div>
+        <div class="product-detail-photo">{% if product_gallery %}<img data-product-main-image src="{{ product_gallery.0.url }}" alt="{{ product.name }}" width="640" height="540" fetchpriority="high"><button type="button" class="product-zoom-open" data-product-zoom aria-label="Povećaj sliku proizvoda" title="Povećaj sliku" aria-haspopup="dialog" aria-controls="productZoomDialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6M10 7v6M7 10h6"/></svg></button>{% else %}<p>Slika nije dodana.</p>{% endif %}</div>
+      </div>
     </div>
     <div class="product-detail-info">
       {% if product.category %}<a class="product-detail-category" href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a>{% endif %}
@@ -34,9 +39,9 @@
   </section>
   {% endif %}
 </main>
-{% if product.image %}<dialog id="productZoomDialog" class="product-zoom-dialog" aria-label="Uvećana slika: {{ product.name }}">
+{% if product_gallery %}<dialog id="productZoomDialog" class="product-zoom-dialog" aria-label="Uvećana slika: {{ product.name }}">
   <form method="dialog"><button type="submit" class="product-zoom-close" aria-label="Zatvori uvećanu sliku">Zatvori ×</button></form>
-  <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy">
+  <img data-product-zoom-image src="{{ product_gallery.0.url }}" alt="{{ product.name }}" loading="lazy">
 </dialog>{% endif %}
 {% include 'shop/partials/bera_footer.html' %}
 {% include 'shop/partials/mobile_menu.html' %}

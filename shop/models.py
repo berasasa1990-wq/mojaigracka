@@ -408,3 +408,14 @@ class BonusRewardClaim(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['order', 'offer'], name='unique_order_bonus_reward')]
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='additional_images')
+    image = AVIFFileField('Dodatna slika', storage=public_image_storage, upload_to='products/gallery/', max_bytes=30_000)
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['position', 'pk']
+        verbose_name = 'Dodatna slika artikla'
+        verbose_name_plural = 'Dodatne slike artikla'

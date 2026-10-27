@@ -425,7 +425,9 @@ def product_detail(request, pk):
             'old_total': sum((member.price for member in members), Decimal('0.00')),
             'new_total': sum((item['price'] for item in items), Decimal('0.00')),
         })
+    gallery = ([product.image] if product.image else []) + [item.image for item in product.additional_images.all() if item.image]
     return render(request, 'shop/product_detail.html', {
+        'product_gallery': gallery,
         'product': product,
         'bundle_sets': bundle_sets,
         'plus_preview_price': (product.plus_product.price * (1 - product.plus_percent / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if product.has_article_plus else None,
