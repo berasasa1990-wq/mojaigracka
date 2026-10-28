@@ -117,7 +117,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in options.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = f'Banner se sprema kao WebP do {limit_kb} KB. Nema fiksnog limita rezolucije; dimenzije se smanjuju samo ako je potrebno za veličinu fajla. Za lijevu i desnu ponudu pripremite 1600 × 600 px (8:3) za prikaz bez praznih rubova.'
+            self.fields[name].help_text = f'Lijevi i desni banner: preporučena dimenzija 1600 × 600 px — omjer 8:3. Banner se sprema kao WebP do {limit_kb} KB. Dimenzije se smanjuju samo ako je potrebno za veličinu fajla.'
 
     def clean(self):
         data = super().clean()

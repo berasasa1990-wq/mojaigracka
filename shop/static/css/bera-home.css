@@ -611,3 +611,7 @@
 .product-card--home-reference .product-prices{margin-top:auto;min-height:26px}
 .product-card--home-reference .product-brand-row{min-height:24px;margin:3px 0 8px}
 .product-card--home-reference .product-brand{margin:0}
+
+.bera-footer__bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.bera-footer__credit{margin-left:auto}
+.bera-footer .bera-footer__credit a{display:inline;margin:0;font-size:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px}

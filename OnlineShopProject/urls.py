@@ -1,3 +1,4 @@
+from shop.category_images import category_icon
 """
 URL configuration for OnlineShopProject project.
 
@@ -18,7 +19,7 @@ from django.contrib import admin
 from django.urls import include, path
 from shop.module_api import update_loyalty_module
 from shop.admin_sso import admin_sso_login
-from shop.views import panel_backup_restore, panel_banner_delete, home, panel, panel_edit, PanelLoginView, PanelLogoutView, product_detail, search_suggestions, cart, cart_update, cart_add_bundle, checkout, account, customer_login, customer_register, customer_logout, wishlist_page, cart_loyalty
+from shop.views import panel_backup_restore, panel_product_delete, panel_banner_delete, home, panel, panel_edit, PanelLoginView, PanelLogoutView, product_detail, search_suggestions, cart, cart_update, cart_add_bundle, checkout, account, customer_login, customer_register, customer_logout, wishlist_page, cart_loyalty
 
 from bera_licensing.views import request_activation, activate, sync_now, activate_module_code
 
@@ -42,6 +43,7 @@ urlpatterns = [
     path('artikal/<int:pk>/obavijest/', stock_notification_subscribe, name='stock_notification_subscribe'),
     path('wms/', include('wms.urls')),
     path('api/chatbot/', chat, name='chatbot_message'),
+    path('kategorija/<int:pk>/ikona.webp', category_icon, name='category_icon'),
     path('robots.txt', robots, name='seo_robots'),
     path('sitemap.xml', sitemap, name='seo_sitemap'),
     path('sitemap-<slug:section>-<int:page>.xml', sitemap, name='seo_sitemap_section'),
@@ -76,6 +78,7 @@ urlpatterns = [
     path('panel/', panel),
     path('panel/prijava/', PanelLoginView.as_view(), name='panel_login'),
     path('panel/odjava/', PanelLogoutView.as_view(), name='panel_logout'),
+    path('panel/artikli/<int:pk>/obrisi/', panel_product_delete, name='panel_product_delete'),
     path('panel/banneri/<int:pk>/ukloni/', panel_banner_delete, name='panel_banner_delete'),
     path('panel/<slug:section>/dodaj/', panel_edit, name='panel_add'),
     path('panel/<slug:section>/<int:pk>/uredi/', panel_edit, name='panel_edit'),

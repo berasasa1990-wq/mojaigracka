@@ -7,5 +7,5 @@
         <div><h3>Moj nalog</h3>{% if loyalty_enabled %}<a href="{% url 'loyalty' %}">Loyalty program</a>{% endif %}<a href="{% url 'home' %}">Prijava</a><a href="{% url 'home' %}">Registracija</a><a href="{% url 'home' %}">Lista želja</a><a href="{% url 'home' %}">Moje narudžbe</a></div>
         <div class="bera-footer__payments"><h3>Načini plaćanja</h3><a href="{% url 'home' %}" class="bera-footer__payment-row"><span>VISA</span><img src="{% static 'img/mastercard.png' %}" alt="Mastercard" width="65" height="38" loading="lazy"><span class="bera-footer__cash">▣ Pouzećem</span></a><a href="{% url 'home' %}">Sigurnost plaćanja</a></div>
     </div>
-    <div class="bera-footer__bottom">© {% now 'Y' %} {{ shop_name }}</div>
+    <div class="bera-footer__bottom"><span>© {% now 'Y' %} Sva prava zadržava Mojaigracka.com</span><span class="bera-footer__credit">Izrada sajta: <a href="https://www.bera-it.com/">BERA-IT</a></span></div>
 </footer>

@@ -32,6 +32,14 @@ class Category(models.Model):
     name = models.CharField('Naziv', max_length=150)
     image = AVIFFileField('Slika', storage=public_image_storage, upload_to='categories/', blank=True)
 
+    @property
+    def icon_url(self):
+        from hashlib import sha256
+        from django.urls import reverse
+        version = sha256(self.image.name.encode()).hexdigest()[:12]
+        return reverse('category_icon', args=[self.pk]) + '?v=' + version
+
+
     class Meta:
         verbose_name = 'Kategorija'
         verbose_name_plural = 'Kategorije'

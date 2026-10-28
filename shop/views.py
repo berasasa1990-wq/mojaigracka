@@ -365,6 +365,22 @@ def panel_banner_delete(request, pk):
     return redirect('panel_section', section='banneri')
 
 
+@panel_required
+@require_POST
+def panel_product_delete(request, pk):
+    from django.contrib import messages
+    from django.db.models.deletion import ProtectedError, RestrictedError
+
+    product = get_object_or_404(Product, pk=pk)
+    try:
+        product.delete()
+    except (ProtectedError, RestrictedError):
+        messages.error(request, 'Artikal se ne može obrisati jer je povezan s narudžbama ili skladišnim evidencijama. Možete isključiti „Prikaži u trgovini“ u uređivanju artikla.')
+    else:
+        messages.success(request, 'Artikal je obrisan.')
+    return redirect('panel_section', section='artikli')
+
+
 def home(request, category_pk=None, sale_only=False, new_only=False, bestselling_only=False, brand_pk=None):
     data = json.loads((Path(settings.BASE_DIR) / 'shop/data/home.json').read_text())
     query = request.GET.get('q', '').strip()

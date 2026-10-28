@@ -5,7 +5,7 @@
 <main class="storefront-main">
 {% if not search_query and not selected_brand and not selected_category and not sale_only and not new_only and not bestselling_only %}
 {% include 'shop/partials/bera_default_hero.html' %}
-<section id="mobileHomeCategories" aria-label="Kategorije"><div class="mobile-home-category-grid">{% for cat in categories %}<a href="{{ cat.get_absolute_url }}">{% if cat.image %}<img class="mobile-home-category-icon" src="{{ cat.image.url }}" alt="" width="74" height="70">{% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M9 9v12"/></svg>{% endif %}<span>{{ cat.name }}</span></a>{% endfor %}</div></section>
+<section id="mobileHomeCategories" aria-label="Kategorije"><div class="mobile-home-category-grid">{% for cat in categories %}<a href="{{ cat.get_absolute_url }}">{% if cat.image %}<img class="mobile-home-category-icon" src="{{ cat.icon_url }}" alt="" width="74" height="70">{% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M9 9v12"/></svg>{% endif %}<span>{{ cat.name }}</span></a>{% endfor %}</div></section>
 {% include 'shop/partials/home_mobile_benefits.html' %}
 {% endif %}
 <div id="proizvodi">
