@@ -152,3 +152,10 @@ def checkout_points_context(request, context, requested=0):
         'points_used': used, 'points_discount': discount, 'points_allowed': allowed,
         'delivery_price': delivery, 'grand_total': net - discount + delivery,
     }
+
+
+def selected_cart_points(request):
+    selection = request.session.get('cart_loyalty_points', {})
+    if request.user.is_authenticated and selection.get('customer') == request.user.pk:
+        return selection.get('points', 0)
+    return 0

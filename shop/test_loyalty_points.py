@@ -75,6 +75,7 @@ class LoyaltyPointsTests(TestCase):
         session = self.client.session
         session['cart'] = {str(product.pk): 1}
         session.save()
+        self.client.post(reverse('cart'), {'loyalty_points': '99999'})
         response = self.client.post(reverse('checkout'), {'customer_name': 'Kupac', 'email': 'a@example.com', 'phone': '061123456', 'address': 'Ulica 1', 'city': 'Sarajevo', 'postal_code': '71000', 'loyalty_points': '99999', 'customer': self.other.pk})
         self.assertEqual(response.status_code, 302)
         order = Order.objects.latest('pk')

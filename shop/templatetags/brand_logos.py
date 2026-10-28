@@ -44,7 +44,7 @@ def brand_logo(brand):
             key = 'brand-geometry:' + hashlib.sha256(repr(namespace).encode()).hexdigest()
             geometry = cache.get(key)
             if geometry is False:
-                return format_html('<img src="{}" alt="{}" loading="lazy">', brand.logo.url, brand.name)
+                return format_html('<img src="{}" alt="{}" loading="lazy">', brand.optimized_logo_url, brand.name)
             if geometry is None:
                 try:
                     geometry = logo_geometry(storage, name, int(time.time() // 300))
@@ -54,8 +54,8 @@ def brand_logo(brand):
                 cache.set(key, geometry, 300)
         width, height, left, top = geometry
     except (OSError, ValueError, NotImplementedError, BotoCoreError, ClientError):
-        return format_html('<img src="{}" alt="{}" loading="lazy">', brand.logo.url, brand.name)
+        return format_html('<img src="{}" alt="{}" loading="lazy">', brand.optimized_logo_url, brand.name)
     return format_html(
         '<span class="normalized-brand"><img src="{}" alt="{}" loading="lazy" style="width:{}px;height:{}px;left:{}px;top:{}px"></span>',
-        brand.logo.url, brand.name, width, height, left, top,
+        brand.optimized_logo_url, brand.name, width, height, left, top,
     )

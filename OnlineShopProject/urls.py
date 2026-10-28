@@ -1,3 +1,5 @@
+from shop.storefront_images import storefront_image
+from shop.brand_images import brand_logo_image
 from shop.category_images import category_icon
 """
 URL configuration for OnlineShopProject project.
@@ -44,6 +46,8 @@ urlpatterns = [
     path('wms/', include('wms.urls')),
     path('api/chatbot/', chat, name='chatbot_message'),
     path('kategorija/<int:pk>/ikona.webp', category_icon, name='category_icon'),
+    path('brend/<int:pk>/logo.webp', brand_logo_image, name='brand_logo_image'),
+    path('prikaz/<slug:kind>/<int:pk>/<int:width>.webp', storefront_image, name='storefront_image'),
     path('robots.txt', robots, name='seo_robots'),
     path('sitemap.xml', sitemap, name='seo_sitemap'),
     path('sitemap-<slug:section>-<int:page>.xml', sitemap, name='seo_sitemap_section'),

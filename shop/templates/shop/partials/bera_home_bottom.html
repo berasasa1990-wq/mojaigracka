@@ -1,8 +1,9 @@
+{% load storefront_images %}
 {% load static %}
 <div class="bera-home-bottom">
     <a class="bera-wide-promo" href="{% if footer_promo_card %}{{ footer_promo_card.url|default:'/akcije/' }}{% else %}{{ site_settings.akcija_banner_href|default:'/akcije/' }}{% endif %}">
         {% if footer_promo_card %}
-        <img class="bera-wide-promo__art" src="{{ footer_promo_card.image.url }}" alt="{{ footer_promo_card.title }}" loading="lazy">
+        <img class="bera-wide-promo__art" {% artwork_sources footer_promo_card 'banner' %} alt="{{ footer_promo_card.title }}" loading="lazy">
         {% elif site_settings.akcija_banner_desktop %}
         <img class="bera-wide-promo__art" src="{{ site_settings.akcija_banner_desktop.url }}" alt="Posebne ponude" loading="lazy">
         {% else %}
@@ -13,7 +14,7 @@
     </a>
     {% if showcase_brands %}<section class="bera-popular-brands" id="brendovi">
       <h2>Popularni brendovi</h2>
-      <div class="bera-popular-brands__carousel"><button data-brand-direction="-1" aria-label="Prethodni brendovi">‹</button><div class="bera-popular-brands__row">{% for brand in showcase_brands %}<a href="{{ brand.get_absolute_url }}" aria-label="Artikli brenda {{ brand.name }}">{% if brand.logo %}<img src="{{ brand.logo.url }}" alt="{{ brand.name }}" loading="lazy" width="110" height="36">{% else %}{{ brand.name }}{% endif %}</a>{% endfor %}</div><button data-brand-direction="1" aria-label="Sljedeći brendovi">›</button></div>
+      <div class="bera-popular-brands__carousel"><button data-brand-direction="-1" aria-label="Prethodni brendovi">‹</button><div class="bera-popular-brands__row">{% for brand in showcase_brands %}<a href="{{ brand.get_absolute_url }}" aria-label="Artikli brenda {{ brand.name }}">{% if brand.logo %}<img src="{{ brand.optimized_logo_url }}" alt="{{ brand.name }}" loading="lazy" width="110" height="36">{% else %}{{ brand.name }}{% endif %}</a>{% endfor %}</div><button data-brand-direction="1" aria-label="Sljedeći brendovi">›</button></div>
     </section>{% endif %}
     <section class="bera-bottom-benefits" aria-label="Pogodnosti kupovine">
         <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 4h13v13H1zM14 9h5l4 5v3h-9"/><circle cx="5" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg><p><strong>BRZA DOSTAVA</strong><span>Brzo i pouzdano</span></p></div>

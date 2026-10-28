@@ -512,8 +512,17 @@ from .cart import cart_context
 
 @ensure_csrf_cookie
 def cart(request):
+    from .cart import checkout_points_context, selected_cart_points
+    context = cart_context(request)
+    if request.method == 'POST':
+        requested = context['points_balance'] if request.POST.get('use_max_points') else request.POST.get('loyalty_points', 0)
+        quote = checkout_points_context(request, context, requested)
+        if request.user.is_authenticated:
+            request.session['cart_loyalty_points'] = {'customer': request.user.pk, 'points': quote['points_used']}
+        return redirect('cart')
+    context.update(checkout_points_context(request, context, selected_cart_points(request)))
     return render(request, 'shop/cart.html', {
-        **cart_context(request),
+        **context,
         'categories': Category.objects.all(),
         'site_settings': StoreSettings.objects.filter(pk=1).first(),
         'shop_name': 'BERA',
@@ -581,12 +590,12 @@ def checkout(request):
     context = cart_context(request)
     if not context['cart_items'] and completed is None:
         return redirect('cart')
-    from .cart import checkout_points_context
+    from .cart import checkout_points_context, selected_cart_points
     if request.method == 'GET' and request.GET.get('points_preview') == '1':
         response = JsonResponse(checkout_points_context(request, context, request.GET.get('points', 0)))
         response['Cache-Control'] = 'no-store'
         return response
-    context.update(checkout_points_context(request, context, request.POST.get('loyalty_points', 0) if request.method == 'POST' else 0))
+    context.update(checkout_points_context(request, context, selected_cart_points(request)))
     initial = {}
     if request.user.is_authenticated:
         from .models import CustomerContact
@@ -622,7 +631,7 @@ def checkout(request):
                 if request.user.is_authenticated and loyalty_enabled():
                     from .loyalty import redeem_points
                     order.save()
-                    points_discount = redeem_points(order, request.user, net, request.POST.get('loyalty_points', 0))
+                    points_discount = redeem_points(order, request.user, net, selected_cart_points(request))
                     order.loyalty_discount += points_discount
                     net -= points_discount
                 order.delivery_price = store.delivery_cost(net) if store else 0
@@ -639,6 +648,7 @@ def checkout(request):
                 request.session['cart'] = {}
                 request.session.pop('gift_popup_offer', None)
                 request.session.pop('loyalty_customer', None)
+                request.session.pop('cart_loyalty_points', None)
                 request.session['last_order'] = order.pk
                 return redirect(reverse('checkout') + '?success=1')
     from .seo import settings_for

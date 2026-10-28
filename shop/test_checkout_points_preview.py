@@ -35,6 +35,7 @@ class CheckoutPointsPreviewTests(TestCase):
         self.card.refresh_from_db()
         self.assertEqual(self.card.points, 1000)
         self.assertFalse(Order.objects.exists())
+        self.client.post(reverse('cart'), {'loyalty_points': 100})
         self.client.post(self.url, dict(customer_name='Kupac', email='buyer@example.com', phone='061123456', address='Ulica 1', city='Sarajevo', postal_code='71000', note='Test', loyalty_points=100))
         order = Order.objects.get()
         self.assertEqual(order.total, Decimal(data['grand_total']))
@@ -56,3 +57,20 @@ class CheckoutPointsPreviewTests(TestCase):
         session['cart'] = {str(self.product.pk): 1}
         session.save()
         self.assertEqual(self.preview(100).json()['points_used'], 0)
+
+    def test_checkout_cannot_override_cart_selection(self):
+        self.client.post(reverse('cart'), {'loyalty_points': 100})
+        response = self.client.get(self.url)
+        self.assertNotContains(response, 'name="loyalty_points"')
+        self.assertEqual(response.context['points_used'], 100)
+        self.client.post(self.url, dict(customer_name='Kupac', email='buyer@example.com', phone='061123456', address='Ulica 1', city='Sarajevo', postal_code='71000', loyalty_points=1000))
+        self.assertEqual(Order.objects.get().loyalty_discount, Decimal('5'))
+        self.assertNotIn('cart_loyalty_points', self.client.session)
+
+    def test_cart_max_remove_and_render(self):
+        self.client.post(reverse('cart'), {'use_max_points': '1'})
+        response = self.client.get(reverse('cart'))
+        self.assertEqual(response.context['points_used'], 1000)
+        self.assertContains(response, 'Primijeni bodove')
+        self.client.post(reverse('cart'), {'loyalty_points': 0})
+        self.assertEqual(self.client.get(self.url).context['points_used'], 0)

@@ -12,6 +12,14 @@ class Brand(models.Model):
     name = models.CharField('Naziv', max_length=150)
     logo = AVIFFileField('Logo', storage=public_image_storage, upload_to='brands/', blank=True)
 
+    @property
+    def optimized_logo_url(self):
+        from hashlib import sha256
+        from django.urls import reverse
+        version = sha256(self.logo.name.encode()).hexdigest()[:12]
+        return reverse('brand_logo_image', args=[self.pk]) + '?v=' + version
+
+
     class Meta:
         verbose_name = 'Brend'
         verbose_name_plural = 'Brendovi'
