@@ -2,7 +2,7 @@
 <p class="gift-popup-intro">Samo za vaš osmijeh: <strong>−{{ percent|floatformat:"-2" }}%</strong> na jedan odabrani artikal.</p>
 <div class="gift-popup-products">
   {% for card in cards %}<article class="gift-popup-product">
-    <a class="gift-popup-image" href="{{ card.product.get_absolute_url }}">{% if card.product.image %}<img src="{{ card.product.image_url }}" alt="{{ card.product.name }}" width="220" height="180">{% else %}<span aria-hidden="true">🎁</span>{% endif %}</a>
+    <a class="gift-popup-image" href="{{ card.product.get_absolute_url }}">{% if card.product.image %}<img src="{{ card.product.image_thumbnail_url }}" alt="{{ card.product.name }}" width="220" height="180" loading="lazy" decoding="async">{% else %}<span aria-hidden="true">🎁</span>{% endif %}</a>
     <span class="gift-popup-percent">−{{ percent|floatformat:"-2" }}%</span>
     <h3><a href="{{ card.product.get_absolute_url }}">{{ card.product.name }}</a></h3>
     <div class="gift-popup-prices"><s>{{ card.product.price|floatformat:2 }} KM</s><strong>{{ card.price|floatformat:2 }} KM</strong></div>

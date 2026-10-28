@@ -1,8 +1,8 @@
 {% load static %}
 <!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">{% include 'shop/partials/seo_head.html' %}<link rel="stylesheet" href="{% static 'css/home.css' %}?v={{ storefront_version }}"><link rel="stylesheet" href="{% static 'css/bera-home.css' %}?v={{ storefront_version }}"><script src="{% static 'home.js' %}?v={{ storefront_version }}" defer></script></head>
-<body class="bera-home home-mobile-reference bera-storefront-header">
+<body class="bera-home home-mobile-reference bera-storefront-header storefront-aligned">
 {% include 'shop/partials/header.html' %}
-<main>
+<main class="storefront-main">
 {% if not search_query and not selected_brand and not selected_category and not sale_only and not new_only and not bestselling_only %}
 {% include 'shop/partials/bera_default_hero.html' %}
 <section id="mobileHomeCategories" aria-label="Kategorije"><div class="mobile-home-category-grid">{% for cat in categories %}<a href="{{ cat.get_absolute_url }}">{% if cat.image %}<img class="mobile-home-category-icon" src="{{ cat.image.url }}" alt="" width="74" height="70">{% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M9 9v12"/></svg>{% endif %}<span>{{ cat.name }}</span></a>{% endfor %}</div></section>

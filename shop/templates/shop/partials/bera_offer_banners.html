@@ -2,7 +2,7 @@
     {% with card=offer_left %}
     {% if card %}
     <a class="bera-offer-banner bera-offer-banner--uploaded" href="{{ card.url|default:'/noviteti/' }}" aria-label="{{ card.title|default:'Noviteti' }}">
-        <img class="bera-offer-banner__uploaded-image" src="{{ card.image.url }}" alt="{{ card.title }}" loading="lazy">
+        <img class="bera-offer-banner__uploaded-image" src="{{ card.image.url }}" alt="{{ card.title }}" width="1600" height="600" loading="lazy">
     </a>
     {% else %}
     <a class="bera-offer-banner bera-offer-banner--dark" href="{% url 'new_arrivals' %}">
@@ -17,7 +17,7 @@
     {% with card=offer_right %}
     {% if card %}
     <a class="bera-offer-banner bera-offer-banner--uploaded" href="{{ card.url|default:'/?akcija=1' }}" aria-label="{{ card.title|default:'Akcijska ponuda' }}">
-        <img class="bera-offer-banner__uploaded-image" src="{{ card.image.url }}" alt="{{ card.title }}" loading="lazy">
+        <img class="bera-offer-banner__uploaded-image" src="{{ card.image.url }}" alt="{{ card.title }}" width="1600" height="600" loading="lazy">
     </a>
     {% else %}
     <a class="bera-offer-banner bera-offer-banner--light" href="{% url 'sales' %}">

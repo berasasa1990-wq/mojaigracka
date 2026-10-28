@@ -191,6 +191,9 @@ STORAGES['public_images'] = (
     _r2_storage if R2_IMAGES_ENABLED
     else {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
 )
+if R2_IMAGES_ENABLED:
+    from shop.storage import product_upload_configuration
+    STORAGES['public_image_uploads'] = product_upload_configuration(_r2_storage)
 
 
 
@@ -244,6 +247,9 @@ LOGGING = {
         'console': {'class': 'logging.StreamHandler'},
     },
     'loggers': {
+        'shop.product_images': {
+            'handlers': ['console'], 'level': 'INFO', 'propagate': False,
+        },
         'shop.image_uploads': {
             'handlers': ['console'], 'level': 'INFO', 'propagate': False,
         },
@@ -254,3 +260,7 @@ LOGGING = {
         },
     },
 }
+
+# Fast WebP is the default. AVIF is optional and attempted once at <=300px only.
+PRODUCT_IMAGE_TRY_AVIF = os.environ.get('PRODUCT_IMAGE_TRY_AVIF', 'false').lower() in ('true', '1', 'yes')
+PRODUCT_IMAGE_AVIF_MAX_SECONDS = 0.08

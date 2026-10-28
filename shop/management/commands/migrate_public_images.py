@@ -34,6 +34,12 @@ class Command(BaseCommand):
             model = apps.get_model('shop', model_name)
             for field in fields:
                 names.update(model.objects.exclude(**{field: ''}).values_list(field, flat=True))
+        for model_name in ('Product', 'ProductImage'):
+            for manifest in apps.get_model('shop', model_name).objects.values_list('image_variants', flat=True):
+                for label in ('thumbnail', 'card', 'main'):
+                    key = manifest.get(label, {}).get('name') if isinstance(manifest, dict) else None
+                    if key:
+                        names.add(key)
         names.discard(None)
         target = None
         if options['apply']:

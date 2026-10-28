@@ -2,6 +2,7 @@ from decimal import Decimal
 import uuid
 from .image_uploads import AVIFFileField
 from .storage import public_image_storage
+from .product_images import ProductImageVariantsMixin
 from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -65,7 +66,7 @@ class ProductQuerySet(models.QuerySet):
         ).filter(order_count__gt=0).order_by('-order_count', '-created_at', '-pk')
 
 
-class Product(models.Model):
+class Product(ProductImageVariantsMixin, models.Model):
     sale_ends_at = models.DateTimeField('Akcija traje do', null=True, blank=True, db_index=True, help_text='Opcionalno. Nakon ovog datuma i vremena akcija automatski prestaje.')
 
     seo_title = models.CharField('SEO naslov', max_length=160, blank=True, help_text='Prazno koristi naziv. Preporuka oko 50–60 znakova.')
@@ -90,6 +91,7 @@ class Product(models.Model):
     name = models.CharField('Naziv', max_length=255)
     description = models.TextField('Opis', blank=True)
     image = AVIFFileField('Slika', storage=public_image_storage, upload_to='products/', blank=True)
+    image_variants = models.JSONField(default=dict, blank=True, editable=False)
     price = models.DecimalField('Cijena', max_digits=10, decimal_places=2)
     original_price = models.DecimalField('Stara cijena', max_digits=10, decimal_places=2, null=True, blank=True)
     brand = models.ForeignKey(Brand, verbose_name='Brend', on_delete=models.SET_NULL, null=True, blank=True)
@@ -126,14 +128,31 @@ class Product(models.Model):
         return reverse('product_detail', kwargs={'pk': self.pk})
 
     @property
-    def image_url(self):
+    def image_sources(self):
+        from .product_images import image_sources
         if not self.image:
-            return ''
-        if not self.is_active:
-            return self.image.url
+            return image_sources(self.image, {})
         from django.urls import reverse
         from urllib.parse import urlencode
-        return reverse('product_image_download', args=[self.pk]) + '?' + urlencode({'image': self.image.name})
+        fallback = (reverse('product_image_download', args=[self.pk]) + '?' + urlencode({'image': self.image.name})
+                    if self.is_active else self.image.url)
+        return image_sources(self.image, self.image_variants, fallback)
+
+    @property
+    def image_url(self):
+        return self.image_sources['url']
+
+    @property
+    def image_card_url(self):
+        return self.image_sources['card_url']
+
+    @property
+    def image_thumbnail_url(self):
+        return self.image_sources['thumbnail_fallback_url']
+
+    @property
+    def image_srcset(self):
+        return self.image_sources['srcset']
 
     def quantity_discount_percent(self, quantity):
         if quantity < 2 or not self.has_quantity_sale:
@@ -421,9 +440,10 @@ class BonusRewardClaim(models.Model):
         constraints = [models.UniqueConstraint(fields=['order', 'offer'], name='unique_order_bonus_reward')]
 
 
-class ProductImage(models.Model):
+class ProductImage(ProductImageVariantsMixin, models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='additional_images')
     image = AVIFFileField('Dodatna slika', storage=public_image_storage, upload_to='products/gallery/', max_bytes=30_000)
+    image_variants = models.JSONField(default=dict, blank=True, editable=False)
     position = models.PositiveIntegerField(default=0)
 
     class Meta:

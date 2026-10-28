@@ -69,3 +69,31 @@ def r2_configuration(environ):
 def public_image_storage():
     """Serializable callable attached only to explicitly public image fields."""
     return storages['public_images']
+
+
+def product_upload_configuration(public_config):
+    """Same bucket/keys, with fail-fast network settings for new derivatives only."""
+    from botocore.config import Config
+    from boto3.s3.transfer import TransferConfig
+    options = dict(public_config['OPTIONS'])
+    options['client_config'] = options['client_config'].merge(Config(
+        connect_timeout=2, read_timeout=5, retries={'total_max_attempts': 1}))
+    options['transfer_config'] = TransferConfig(use_threads=False)
+    return {'BACKEND': public_config['BACKEND'], 'OPTIONS': options}
+
+
+def save_product_derivatives(default_storage, files):
+    """Three independent new keys; no overwrites, deletes or database access here."""
+    from django.conf import settings
+    from storages.backends.s3 import S3Storage
+    storage = (storages['public_image_uploads']
+               if settings.R2_IMAGES_ENABLED and 'public_image_uploads' in storages.backends
+               else default_storage)
+    if isinstance(storage, S3Storage):
+        from concurrent.futures import ThreadPoolExecutor
+        # All submitted uploads are joined before leaving the request. These are
+        # bounded network calls, not untracked background jobs or a task queue.
+        with ThreadPoolExecutor(max_workers=3, thread_name_prefix='product-media') as executor:
+            jobs = {label: executor.submit(storage.save, name, content) for label, (name, content) in files.items()}
+            return {label: job.result() for label, job in jobs.items()}
+    return {label: storage.save(name, content) for label, (name, content) in files.items()}

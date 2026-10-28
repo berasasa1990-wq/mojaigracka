@@ -51,9 +51,16 @@ class ImageUploadTests(TestCase):
                     setattr(instance, field, original)
                     instance.save()
                     saved = getattr(instance, field)
-                    self.assertTrue(saved.name.endswith('.png'))
-                    with saved.open('rb') as file:
-                        self.assertEqual(file.read(), data)
+                    if isinstance(instance, (Product, ProductImage)):
+                        self.assertTrue(saved.name.endswith('.webp'))
+                        self.assertEqual(instance.image_variants['source'], saved.name)
+                    elif isinstance(instance, Banner):
+                        self.assertTrue(saved.name.endswith('.webp'))
+                        self.assertLessEqual(saved.size, 200_000)
+                    else:
+                        self.assertTrue(saved.name.endswith('.png'))
+                        with saved.open('rb') as file:
+                            self.assertEqual(file.read(), data)
                     name = saved.name
                     instance.save()
                     self.assertEqual(getattr(instance, field).name, name)
@@ -66,12 +73,13 @@ class ImageUploadTests(TestCase):
                          ProductForm({'name': 'Product', 'price': 10, 'is_active': 'on'}, {'image': upload()}),
                          BannerForm({'position': 'hero', 'title': 'Banner'}, {'image': upload(), 'secondary_image': upload()})]:
                 with patch('shop.image_uploads.Image.open', wraps=image_uploads.Image.open) as opened, \
-                        patch('shop.image_uploads._encode') as encode:
+                        patch('shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
                     self.assertTrue(form.is_valid(), form.errors)
                     count = opened.call_count
+                    encodes = encode.call_count
                     form.save()
                     self.assertEqual(opened.call_count, count)
-                    encode.assert_not_called()
+                    self.assertEqual(encode.call_count, encodes)
 
     def test_animation_and_transparency_are_not_modified(self):
         output = BytesIO()
@@ -92,33 +100,30 @@ class ImageUploadTests(TestCase):
         with patch('shop.image_uploads.MAX_UPLOAD_BYTES', 10), self.assertRaises(ValidationError):
             optimize_image(upload())
 
-    def test_large_banner_no_longer_has_compression_budget(self):
+    def test_large_banner_upload_is_automatically_fitted_to_200kb(self):
         original = upload(Image.effect_noise((1600, 600), 70).convert('RGB'))
         self.assertGreater(original.size, 150_000)
         data = original.read()
         original.seek(0)
         form = BannerForm({'position': 'hero', 'title': 'Original'}, {'image': original})
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data['image'].read(), data)
+        self.assertLessEqual(form.cleaned_data['image'].size, 200_000)
 
 
-    def test_product_uploads_receive_branded_filename_and_preserve_bytes(self):
+    def test_product_uploads_receive_branded_unique_filenames(self):
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
             product = Product.objects.create(name='Hot Wheel', price=10)
-            for format, extension in [('PNG', '.png'), ('JPEG', '.jpg'), ('AVIF', '.avif')]:
-                original = upload(Image.new('RGB', (100, 50), 'blue'), format)
-                data = original.read()
-                original.seek(0)
-                product.image = original
+            for format in ('PNG', 'JPEG', 'WEBP', 'GIF', 'AVIF'):
+                product.image = upload(Image.new('RGB', (100, 50), 'blue'), format)
                 product.save()
-                self.assertEqual(product.image.name, 'products/mojaigracka.com - Hot Wheel' + extension)
-                with product.image.open('rb') as stored:
-                    self.assertEqual(stored.read(), data)
+                self.assertTrue(product.image.name.startswith('products/mojaigracka.com - Hot Wheel'))
+                self.assertTrue(product.image.name.endswith('.webp'))
+                with product.image.open('rb') as stored, Image.open(stored) as image:
+                    self.assertEqual(image.format, 'WEBP')
             extra = ProductImage.objects.create(product=product, image=upload())
-            self.assertEqual(extra.image.name, 'products/gallery/mojaigracka.com - Hot Wheel.png')
             duplicate = ProductImage.objects.create(product=product, image=upload())
+            self.assertTrue(extra.image.name.startswith('products/gallery/mojaigracka.com - Hot Wheel'))
             self.assertNotEqual(duplicate.image.name, extra.image.name)
-            self.assertTrue(duplicate.image.name.startswith('products/gallery/mojaigracka.com - Hot Wheel'))
 
     def test_product_filename_is_safe_and_fits_field_length(self):
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
@@ -129,39 +134,7 @@ class ImageUploadTests(TestCase):
             self.assertNotIn('\n', product.image.name)
 
 
-    def test_larger_product_uploads_are_fitted_to_20kb_in_the_same_format(self):
-        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
-            for format in ('PNG', 'JPEG', 'WEBP', 'AVIF', 'GIF'):
-                source = upload(Image.effect_noise((900, 600), 70).convert('RGB'), format)
-                self.assertGreater(source.size, 20_000)
-                with self.subTest(format=format):
-                    form = ProductForm({'name': format, 'price': 10, 'is_active': 'on'}, {'image': source})
-                    self.assertTrue(form.is_valid(), form.errors)
-                    product = form.save()
-                    self.assertLessEqual(product.image.size, 20_000)
-                    with product.image.open('rb') as file, Image.open(file) as image:
-                        self.assertEqual(image.format, format)
-                        self.assertAlmostEqual(image.width / image.height, 1.5, delta=.02)
-            form = ProductForm({'name': 'Extra', 'price': 10}, {
-                'additional_images': [upload(Image.effect_noise((900, 600), 70).convert('RGB'))]})
-            self.assertTrue(form.is_valid(), form.errors)
-            product = form.save()
-            self.assertLessEqual(product.additional_images.get().image.size, 20_000)
 
-    def test_direct_uploads_obey_limit_and_form_save_does_not_encode_twice(self):
-        from . import image_uploads
-        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
-            product = Product.objects.create(name='Direct', price=10,
-                image=upload(Image.effect_noise((900, 600), 70).convert('RGB')))
-            self.assertLessEqual(product.image.size, 20_000)
-            with patch('shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
-                form = ProductForm({'name': 'Once', 'price': 10}, {
-                    'image': upload(Image.effect_noise((900, 600), 70).convert('RGB'))})
-                self.assertTrue(form.is_valid(), form.errors)
-                count = encode.call_count
-                self.assertGreater(count, 0)
-                form.save()
-                self.assertEqual(encode.call_count, count)
 
     def test_existing_large_image_is_kept_during_unrelated_edit(self):
         product = Product.objects.create(name='Existing', price=10, image='products/existing.jpg')
@@ -187,10 +160,8 @@ class ImageUploadTests(TestCase):
             self.assertEqual(image.format, 'GIF')
             self.assertEqual(image.n_frames, 2)
 
-    def test_failed_size_fit_is_a_form_error_and_never_saves_oversized_data(self):
-        with patch('shop.image_uploads._encode', return_value=b'x' * 20_001) as encode:
-            form = ProductForm({'name': 'Cannot fit', 'price': 10}, {
-                'image': upload(Image.effect_noise((400, 300), 70).convert('RGB'))})
+    def test_encoder_failure_returns_form_error(self):
+        with patch('shop.image_uploads._encode', side_effect=RuntimeError('encoder unavailable')):
+            form = ProductForm({'name': 'Original', 'price': 10}, {'image': upload()})
             self.assertFalse(form.is_valid())
             self.assertIn('image', form.errors)
-            self.assertLessEqual(encode.call_count, 8)

@@ -33,12 +33,11 @@ class MultipleProductImagesField(forms.FileField):
     widget = MultipleImageInput(attrs={'accept': 'image/png,image/jpeg,image/webp,image/gif,image/avif'})
 
     def clean(self, data, initial=None):
-        from .image_uploads import optimize_image, MAX_PRODUCT_IMAGE_BYTES
+        from .image_uploads import optimize_image
         files = data if isinstance(data, (list, tuple)) else ([data] if data else [])
         if len(files) > 6:
             raise forms.ValidationError('Dodajte najviše 6 slika odjednom.')
-        return [optimize_image(super(MultipleProductImagesField, self).clean(file),
-                               max_original_bytes=MAX_PRODUCT_IMAGE_BYTES)
+        return [optimize_image(super(MultipleProductImagesField, self).clean(file), product_variants=True)
                 for file in files]
 
 
@@ -56,7 +55,7 @@ class ProductForm(forms.ModelForm):
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
 
     additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
-        help_text='Odaberite više slika, najviše 6 odjednom. Automatsko smanjivanje na najviše 20 KB po slici, uz isti format i što bolji kvalitet. Prikazuju se lijevo od glavne slike.')
+        help_text='Odaberite više slika, najviše 6 odjednom. Automatski se generišu veličine 300, 500 i 800 px. KB ciljevi su okvirni, bez agresivnog gubitka kvaliteta. Prikazuju se lijevo od glavne slike.')
 
     @property
     def gallery_images(self):
@@ -106,15 +105,19 @@ class BannerForm(forms.ModelForm):
         model = Banner
         fields = ['position', 'title', 'eyebrow', 'subtitle', 'button_text', 'features', 'image', 'secondary_image', 'url', 'is_active']
         widgets = {'title': forms.Textarea(attrs={'rows': 2})}
-        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Svi banneri čuvaju originalni format, kvalitet i dimenzije. Do 20 MB i 12 megapiksela.'}
+        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Glavni i veliki banneri spremaju se kao WebP do 200 KB; lijevi i desni do 150 KB.'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .image_uploads import BANNER_IMAGE_OPTIONS
+        from .image_uploads import banner_image_options
+        position = (self.data.get(self.add_prefix('position')) if self.is_bound
+                    else self.initial.get('position', self.instance.position))
+        options = banner_image_options(position)
+        limit_kb = options['max_original_bytes'] // 1000
         for name in ('image', 'secondary_image'):
-            for option, value in BANNER_IMAGE_OPTIONS.items():
+            for option, value in options.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'Slika se sprema u originalnom formatu, kvalitetu i dimenzijama. Do 20 MB i 12 megapiksela.'
+            self.fields[name].help_text = f'Banner se sprema kao WebP do {limit_kb} KB. Nema fiksnog limita rezolucije; dimenzije se smanjuju samo ako je potrebno za veličinu fajla. Za lijevu i desnu ponudu pripremite 1600 × 600 px (8:3) za prikaz bez praznih rubova.'
 
     def clean(self):
         data = super().clean()

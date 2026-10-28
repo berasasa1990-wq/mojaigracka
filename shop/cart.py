@@ -84,7 +84,7 @@ def article_plus_offer(product, saved):
     return {'name': second.name, 'percent': format(product.plus_percent.normalize(), 'f'),
             'price': f'{price:.2f}', 'regular_price': f'{second.price:.2f}',
             'url': second.get_absolute_url(), 'add_url': reverse('cart_update', args=[second.pk]),
-            'image': second.image_url if second.image else '', 'first_name': product.name}
+            'image': second.image_thumbnail_url if second.image else '', 'first_name': product.name}
 
 
 def quantity_offers(product, current_quantity):

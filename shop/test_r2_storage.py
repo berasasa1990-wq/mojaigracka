@@ -226,3 +226,52 @@ class PublicImageFallbackTests(TestCase):
         self.remote.custom_domain = 'media.example.com'
         with patch('shop.storage.public_image_storage', return_value=self.remote):
             self.assertContains(self.client.get('/'), 'data-public-image-domain="media.example.com"')
+
+
+class ProductVariantR2MimeTests(SimpleTestCase):
+    @override_settings(PRODUCT_IMAGE_TRY_AVIF=False)
+    def test_all_variants_upload_with_actual_mime_and_no_acl(self):
+        from .product_images import prepare_product_image
+        from .test_image_uploads import upload
+        result = prepare_product_image(upload())
+        config, _ = r2_configuration(ENV)
+        storage = S3Storage(**config['OPTIONS'])
+        client = storage.connection.meta.client
+        with patch.object(storage, 'exists', return_value=False), Stubber(client) as stub:
+            for label, item in result._product_derivatives.items():
+                name = f'products/variants/test-{label}.webp'
+                stub.add_response('put_object', {'ETag': '"test"'}, {
+                    'Bucket': 'mojaigracka-media', 'Key': name, 'Body': ANY, 'ContentType': 'image/webp'})
+                self.assertEqual(storage.save(name, item['file']), name)
+            stub.assert_no_pending_responses()
+
+
+class ProductVariantTransportTests(SimpleTestCase):
+    def test_write_alias_has_short_timeouts_single_attempt_and_same_bucket(self):
+        from .storage import product_upload_configuration
+        config, _ = r2_configuration(ENV)
+        writer = product_upload_configuration(config)
+        self.assertEqual(writer['OPTIONS']['bucket_name'], config['OPTIONS']['bucket_name'])
+        self.assertEqual(writer['OPTIONS']['client_config'].connect_timeout, 2)
+        self.assertEqual(writer['OPTIONS']['client_config'].read_timeout, 5)
+        self.assertEqual(writer['OPTIONS']['client_config'].retries, {'total_max_attempts': 1})
+        self.assertEqual(config['OPTIONS']['client_config'].read_timeout, 20)
+        self.assertFalse(writer['OPTIONS']['transfer_config'].use_threads)
+
+    @override_settings(R2_IMAGES_ENABLED=False)
+    def test_r2_variant_writes_use_a_fixed_pool_and_do_not_delete(self):
+        import threading
+        from .storage import save_product_derivatives
+        config, _ = r2_configuration(ENV)
+        storage = S3Storage(**config['OPTIONS'])
+        barrier = threading.Barrier(3)
+        def save(name, content):
+            barrier.wait(timeout=2)
+            return name
+        files = {label: (f'products/{label}.webp', ContentFile(b'data'))
+                 for label in ('thumbnail', 'card', 'main')}
+        with patch.object(storage, 'save', side_effect=save) as saved, patch.object(storage, 'delete') as deleted:
+            result = save_product_derivatives(storage, files)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(saved.call_count, 3)
+        deleted.assert_not_called()

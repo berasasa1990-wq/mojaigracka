@@ -272,7 +272,7 @@ def panel(request, section=None, orders_in_wms=False):
             'name': p.name,
             'detail': f'{p.price:.2f} KM',
             'original_price': f'{p.original_price:.2f} KM' if p.original_price and p.original_price > p.price else '',
-            'image_url': p.image_url if p.image else '',
+            'image_url': p.image_thumbnail_url if p.image else '',
         } for p in Product.objects.all()]
     elif section == 'kategorije':
         rows = [{'id': c.pk, 'name': c.name, 'image_url': c.image.url if c.image else ''} for c in Category.objects.all()]
@@ -281,7 +281,7 @@ def panel(request, section=None, orders_in_wms=False):
     elif section == 'banneri':
         rows = [{'id': b.pk, 'name': b.title, 'detail': b.get_position_display(), 'image_url': b.image.url if b.image else ''} for b in Banner.objects.all()]
     elif section == 'akcije':
-        rows = [{'id': p.pk, 'name': p.name, 'detail': f'{p.price:.2f} KM', 'image_url': p.image_url if p.image else ''} for p in Product.objects.filter(is_active=True).on_sale()]
+        rows = [{'id': p.pk, 'name': p.name, 'detail': f'{p.price:.2f} KM', 'image_url': p.image_thumbnail_url if p.image else ''} for p in Product.objects.filter(is_active=True).on_sale()]
     elif section == 'korisnici':
         from django.contrib.auth import get_user_model
         rows = list(get_user_model().objects.order_by('-date_joined', '-pk'))
@@ -338,10 +338,15 @@ def panel_edit(request, section, pk=None):
                     Product.objects.filter(pk=instance.pk).update(sale_type='regular', bundle_percent=None, sale_ends_at=None)
                     instance.bundle_products.clear()
         else:
-            form.save()
-        from django.contrib import messages
-        messages.success(request, 'Izmjene su spremljene.')
-        return redirect('panel_section', section=section)
+            from .product_images import ProductImageUploadError
+            try:
+                form.save()
+            except ProductImageUploadError as error:
+                form.add_error(None, error)
+        if not form.errors:
+            from django.contrib import messages
+            messages.success(request, 'Izmjene su spremljene.')
+            return redirect('panel_section', section=section)
     return render(request, 'shop/panel.html', {
         'sections': PANEL_SECTIONS,
         'selected': next(item for item in PANEL_SECTIONS if item['slug'] == section),
@@ -411,6 +416,7 @@ def home(request, category_pk=None, sale_only=False, new_only=False, bestselling
         'bestselling_only': bestselling_only,
         'new_only': new_only,
         'sale_only': sale_only,
+        'prioritize_product_images': bool(query or selected_brand or selected_category or sale_only or new_only or bestselling_only),
         'search_query': query,
         'category_filter': selected_category.pk if selected_category else '',
         'selected_category': selected_category,
@@ -440,9 +446,14 @@ def product_detail(request, pk):
             'old_total': sum((member.price for member in members), Decimal('0.00')),
             'new_total': sum((item['price'] for item in items), Decimal('0.00')),
         })
-    gallery = ([product.image] if product.image else []) + [item.image for item in product.additional_images.all() if item.image]
+    from .product_images import image_sources
     from urllib.parse import urlencode
-    gallery = [{'name': photo.name, 'url': reverse('product_image_download', args=[product.pk]) + '?' + urlencode({'image': photo.name})} for photo in gallery]
+    photos = ([(product.image, product.image_variants)] if product.image else []) + [
+        (photo.image, photo.image_variants) for photo in product.additional_images.all() if photo.image]
+    gallery = []
+    for photo, manifest in photos:
+        fallback = reverse('product_image_download', args=[product.pk]) + '?' + urlencode({'image': photo.name})
+        gallery.append({'name': photo.name, **image_sources(photo, manifest, fallback)})
     return render(request, 'shop/product_detail.html', {
         'product_gallery': gallery,
         'product': product,
@@ -473,7 +484,7 @@ def search_suggestions(request):
         products = products.bestsellers()
     return JsonResponse({'products': [
         {'name': p.name, 'url': p.get_absolute_url(),
-         'image': p.image_url if p.image else '', 'price': f'{p.price:.2f} KM'}
+         'image': p.image_thumbnail_url if p.image else '', 'price': f'{p.price:.2f} KM'}
         for p in products[:8]
     ]})
 

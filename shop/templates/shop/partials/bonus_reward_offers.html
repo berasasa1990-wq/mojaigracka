@@ -4,7 +4,7 @@
   <h2 id="bonusRewardTitle">Bonus nagrada za vašu narudžbu</h2>
   <p>Dodajte bonus artikal uz poseban popust u narudžbu #{{ completed_order.pk }}.</p>
   <div class="bonus-reward-grid">{% for offer in bonus_offers %}<article class="bonus-reward-card">
-    {% if offer.product.image %}<img src="{{ offer.product.image_url }}" alt="{{ offer.product.name }}" width="160" height="140">{% endif %}
+    {% if offer.product.image %}<img src="{{ offer.product.image_thumbnail_url }}" alt="{{ offer.product.name }}" width="160" height="140">{% endif %}
     <h3>{{ offer.product.name }}</h3><span>−{{ offer.percent|floatformat:"-2" }}%</span>
     <p><s>{{ offer.product.price|floatformat:2 }} KM</s> <strong>{{ offer.discounted_price|floatformat:2 }} KM</strong></p>
     <form method="post" action="{% url 'bonus_reward_add' offer.pk %}">{% csrf_token %}<button type="submit" class="purchase">Dodaj u postojeću narudžbu</button></form>

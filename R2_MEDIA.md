@@ -158,3 +158,25 @@ Na www.mojaigracka.com provjereni logo, banner i slika artikla vraćali su 200 i
 ispravno su dekodirani tokom dijagnostike. To potvrđuje postojanje tih objekata,
 ali ne utvrđuje uzrok greške u korisnikovom pregledniku. Rezervno učitavanje
 zahtijeva objavu ovih izmjena na serveru.
+
+
+## Nove responsive slike artikala
+
+Product.image i ProductImage.image sadrže novu glavnu verziju do 800 px.
+JSON `image_variants` povezuje thumbnail do 300 px, karticu do 500 px i glavnu
+verziju, uključujući stvarne dimenzije, MIME i veličine. Sva tri objekta koriste
+isti javni bucket i nove jedinstvene ključeve. `migrate_public_images` u inventar
+uključuje i te ključeve; komanda nije automatski pokrenuta.
+
+Za nova slanja artikala postoji alias `public_image_uploads` istog R2 backenda,
+bucketa i vjerodajnica. Ima connect_timeout=2, read_timeout=5 i ukupno jedan
+pokušaj zahtjeva, bez S3 transfer niti. Najviše tri upload mrežne operacije
+izvršavaju se paralelno i sve se čekaju prije završetka zahtjeva. Glavni
+`public_images` alias za čitanje i ostale fajlove ostaje sa starim timeoutima.
+MIME se šalje iz ContentFile.content_type; ekstenzije odgovaraju encoderu. Nema
+ACL-a, prepisivanja postojećih objekata niti automatskog brisanja na greškama.
+
+Ako upload jednog derivata ne uspije, manifest ne ulazi u bazu i stara
+referenca ostaje. Djelimično poslani novi objekti mogu ostati u bucketu; nema
+automatskog brisanja jer je traženo očuvanje svih R2 objekata. Pratiti
+`product_image_store` (mreža/storage) odvojeno od `product_image` (obrada).

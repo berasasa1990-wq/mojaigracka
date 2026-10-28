@@ -1,3 +1,119 @@
+# Prikaz lijevog i desnog bannera
+
+Lijeva i desna ponuda zajedno popunjavaju širinu sadržaja poravnatog s logom,
+u dvije jednake kolone. Slike popunjavaju kartice preko object-fit:cover.
+Preporučena priprema svake slike je 1600×600 px (8:3); u tom omjeru nema
+praznih rubova ni rezanja sadržaja. Drugi omjeri mogu biti odrezani na rubovima.
+Stvarna prikazana širina je prilagodljiva, pola kontejnera umanjena za razmak.
+Limit ostaje WebP do 150 KB po slici.
+
+---
+
+# Aktuelni banner profil: WebP 200/150 KB
+
+Svi novi banneri konvertuju se u stvarni WebP, uz ispravnu ekstenziju i MIME.
+Glavni, veliki i donji banner imaju limit 200.000 bajtova; lijeva/desna ponuda
+150.000 bajtova za obje slike. Ukinut je fiksni resize limit 1920/1280 px: prvo
+se pokušava puna rezolucija i kvalitet 95/90/85. Dimenzije se proporcionalno
+smanjuju samo ako je potrebno da fajl stane u limit, bez cropovanja. Pripremljeni
+WebP koji već stane u limit ostaje neizmijenjen. Nema AVIF enkodiranja bannera.
+Forme, direktni model upload i FieldFile.save koriste isto pravilo. Naziv ostaje
+„mojaigracka.com - naziv bannera.webp“. Ulazna provjera ispravnosti i zaštitni
+limiti 20 MiB / 12 megapiksela ostaju, radi memorije i stabilnosti web workera.
+Postojeći fajlovi nisu mijenjani niti brisani; promjena važi za nove uploadove.
+Profil responsive slika artikala nije promijenjen. Nova DB migracija nije potrebna.
+
+Ovo zamjenjuje ranije profile bannera od 150/80 KB i čuvanje izvornog formata.
+
+---
+
+# Poboljšana oštrina novih bannera
+
+Za bannere ostaju kvalitet 95/90 i postojeći limiti 150 KB, odnosno 80 KB za
+lijevu i desnu ponudu. WebP koristi method=2, JPEG optimizovane kodne tabele,
+a PNG compress_level=9. Efikasnija kompresija i manja rezerva pri računanju
+resizanja pomažu da se sačuva veća rezolucija u istom budžetu. Pripremljeni
+banneri koji već stanu u limit ne mijenjaju se. Ovo ne mijenja novi profil
+300/500/800 px za artikle. Ranije izgubljeni detalji traže ponovni upload originala.
+
+---
+
+# Aktuelni pipeline artikala: tri responsive veličine
+
+Za nove slike artikala i dodatne slike aktivan je profil 300/500/800 px sa mekim
+KB ciljevima. Zamjenjuje sve ranije stroge limite od 20/30/50 KB i pravila o
+čuvanju izvornog formata za artikle. Detalji, testovi, R2 timeouti, migracija i
+benchmark: [PRODUCT_IMAGE_PIPELINE.md](PRODUCT_IMAGE_PIPELINE.md).
+
+Postojeće slike i R2 objekti ne prerađuju se niti brišu. Ranije politike drugih
+vrsta slika i bannera ostaju odvojene.
+
+---
+
+# Lijeva i desna ponuda: do 80 KB
+
+Za pozicije offer_left i offer_right obje slike automatski se obrađuju do 80.000
+bajtova po slici. Format i naslov u nazivu fajla ostaju, kvalitet 95/90, priprema
+do 1280 px i smanjenje dimenzija samo po potrebi. Forma određuje profil iz
+odabrane pozicije, a model ga provjerava i pri direktnom uploadu. Ostale pozicije
+bannera ostaju na 150 KB; artikli na 50 KB.
+
+Ponude su u dvije jednake kolone, maksimalne ukupne širine 1440 px, s razmakom
+između njih. Učitane slike imaju omjer 8:3 i object-fit:contain, bez rezanja i
+razvlačenja. Preporučena priprema je 960×360 px. Dvije kolone ostaju i na telefonu.
+Postojeće datoteke zahtijevaju ponovni upload originala za novu obradu.
+
+---
+
+# Aktuelni banner profil: visok kvalitet do 150 KB
+
+Sve nove glavne i dodatne slike bannera automatski se prilagođavaju do 150.000
+bajtova, u izvornom formatu. Pripremljene slike koje već stanu u limit ostaju
+neizmijenjene. Za veće lossy slike koriste se kvaliteti 95/90, najviše 1920 px
+po dužoj strani, a rezolucija se smanjuje samo po potrebi. Brzi WebP method=0
+i AVIF speed=10 / jedna nit ostaju radi ograničavanja CPU troška; obrada ima
+najviše osam pokušaja i provjeru pet sekundi između pokušaja. Za složene slike
+nije moguće garantovati iste detalje unutar zadane veličine.
+
+Fajlovi bannera dobijaju naziv „mojaigracka.com - naziv bannera“ uz izvornu
+ekstenziju. Kod duplih imena dodaje se kratka oznaka bez prepisivanja stare
+slike. Ovo važi za obje slike i sve pozicije bannera. Postojeći fajlovi ostaju
+neizmijenjeni; za novu obradu i naziv potreban je ponovni upload originala.
+Artikli ostaju na 50 KB. Nije potrebna migracija baze.
+
+---
+
+# Aktuelni profil artikala: automatski do 50 KB
+
+Glavne i dodatne slike artikala prihvataju veći upload (do 20 MB / 12 megapiksela)
+i automatski se smanjuju na najviše 50.000 bajtova, u izvornom formatu. Slike
+koje već stanu u limit ostaju neizmijenjene. Pokušaji za lossy formate koriste
+kvalitet 90/85, a zatim po potrebi proporcionalno smanjuju rezoluciju. PNG/GIF
+zadržavaju format; za složene slike nije moguće garantovati iste detalje u 50 KB.
+Nazivi ostaju „mojaigracka.com - naziv artikla“ s izvornom ekstenzijom. Forma i
+model ne obrađuju isti rezultat dvaput. Ostale slike i banneri nisu obuhvaćeni
+ovim limitom. Postojeće slike zahtijevaju novi upload originala za novu obradu.
+
+Ovaj profil zamjenjuje ranije odluke o 20 KB i čuvanju neograničenog originala.
+Nije potrebna migracija baze.
+
+---
+
+# Najnovije pravilo: maksimalni kvalitet artikala
+
+Uklonjen je limit 20 KB za nove glavne i dodatne slike artikala. Svi uploadovi
+čuvaju izvorne bajtove, format, rezoluciju i kvalitet; nema kompresije ni resizanja.
+Ostaju ulazni limiti 20 MB i 12 megapiksela. Nazivi fajlova i dalje koriste
+„mojaigracka.com - naziv artikla“ uz izvornu ekstenziju. Preuzimanje također
+streama original bez konverzije. Ranije umanjene slike zahtijevaju ponovni upload
+originala, jer se izgubljeni detalji ne mogu vratiti. Runtime profil više ne
+uključuje ograničenje izlaznih bajtova; stari pomoćni kod i argumenti ostaju
+kompatibilni, ali se ne koriste pri uploadu artikala.
+
+Ovo zamjenjuje sve ranije opisane profile i ograničenja u nastavku dokumenta.
+
+---
+
 # Aktuelno pravilo: sačuvaj originalnu sliku
 
 Svi novi uploadovi čuvaju originalni format. Artikli veći od 20 KB se kompresuju

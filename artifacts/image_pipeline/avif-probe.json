@@ -1,0 +1,138 @@
+{
+  "pillow": "12.3.0",
+  "architecture": "arm64",
+  "runs": 3,
+  "avif_probe": true,
+  "scope": "local encoding only; excludes R2 network",
+  "samples": [
+    {
+      "input": "gradient-text.png",
+      "input_bytes": 10474,
+      "median_ms": 41.71,
+      "max_ms": 61.43,
+      "median_cpu_ms": 41.7,
+      "median_avif_probe_ms": 1.59,
+      "variants": {
+        "thumbnail": {
+          "width": 300,
+          "height": 225,
+          "bytes": 626,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            10000,
+            15000
+          ]
+        },
+        "card": {
+          "width": 500,
+          "height": 375,
+          "bytes": 1240,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            15000,
+            30000
+          ]
+        },
+        "main": {
+          "width": 800,
+          "height": 600,
+          "bytes": 2312,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            30000,
+            60000
+          ]
+        }
+      }
+    },
+    {
+      "input": "high-detail-noise.png",
+      "input_bytes": 4869813,
+      "median_ms": 81.88,
+      "max_ms": 82.04,
+      "median_cpu_ms": 81.85,
+      "median_avif_probe_ms": 4.01,
+      "variants": {
+        "thumbnail": {
+          "width": 300,
+          "height": 225,
+          "bytes": 18728,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            10000,
+            15000
+          ]
+        },
+        "card": {
+          "width": 500,
+          "height": 375,
+          "bytes": 68698,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            15000,
+            30000
+          ]
+        },
+        "main": {
+          "width": 800,
+          "height": 600,
+          "bytes": 211142,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            30000,
+            60000
+          ]
+        }
+      }
+    },
+    {
+      "input": "transparent.png",
+      "input_bytes": 14504,
+      "median_ms": 50.27,
+      "max_ms": 51.17,
+      "median_cpu_ms": 50.25,
+      "median_avif_probe_ms": 4.47,
+      "variants": {
+        "thumbnail": {
+          "width": 300,
+          "height": 225,
+          "bytes": 10474,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            10000,
+            15000
+          ]
+        },
+        "card": {
+          "width": 500,
+          "height": 375,
+          "bytes": 18798,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            15000,
+            30000
+          ]
+        },
+        "main": {
+          "width": 800,
+          "height": 600,
+          "bytes": 31788,
+          "format": "WEBP",
+          "mime": "image/webp",
+          "target": [
+            30000,
+            60000
+          ]
+        }
+      }
+    }
+  ]
+}

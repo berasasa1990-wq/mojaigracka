@@ -537,6 +537,8 @@ document.querySelectorAll('[data-product-image]').forEach(button => {
     const main = document.querySelector('[data-product-main-image]');
     const zoom = document.querySelector('[data-product-zoom-image]');
     if (!main) return;
+    if (button.dataset.productSrcset) main.setAttribute('srcset', button.dataset.productSrcset);
+    else main.removeAttribute('srcset');
     main.src = button.dataset.productImage;
     if (zoom) zoom.src = button.dataset.productImage;
     document.querySelectorAll('[data-product-image]').forEach(item => {

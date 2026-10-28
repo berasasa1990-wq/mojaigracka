@@ -23,7 +23,7 @@ class ProductGalleryTests(TestCase):
         self.product = Product.objects.create(name='Gallery', price=10, image=upload())
 
     def image_url(self, photo):
-        return reverse('product_image_download', args=[self.product.pk]) + '?' + urlencode({'image': photo.image.name})
+        return photo.image.storage.url(photo.image_variants['main']['name']) if photo.image_variants else reverse('product_image_download', args=[self.product.pk]) + '?' + urlencode({'image': photo.image.name})
 
     def data(self):
         return {'name': 'Gallery', 'price': '10', 'stock': '1', 'is_active': 'on'}
@@ -34,7 +34,7 @@ class ProductGalleryTests(TestCase):
             response = self.client.post(f'/panel/artikli/{self.product.pk}/uredi/',
                                         {**self.data(), 'additional_images': [upload(), upload()]})
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(encode.call_count, 0)  # Form results are not re-encoded by model.
+        self.assertEqual(encode.call_count, 6)  # Form results are not re-encoded by model.
         self.product.refresh_from_db()
         self.assertEqual(self.product.image.name, original)
         photos = list(self.product.additional_images.all())
