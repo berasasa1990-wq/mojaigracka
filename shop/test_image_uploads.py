@@ -127,3 +127,28 @@ class ImageUploadTests(TestCase):
             self.assertTrue(product.image.name.startswith('products/mojaigracka.com - '))
             self.assertNotIn('..', product.image.name)
             self.assertNotIn('\n', product.image.name)
+
+
+    def test_product_images_over_20kb_are_rejected_without_quality_loss(self):
+        original = upload(Image.effect_noise((400, 300), 70).convert('RGB'))
+        self.assertGreater(original.size, 20_000)
+        form = ProductForm({'name': 'Too large', 'price': 10}, {'image': original})
+        self.assertFalse(form.is_valid())
+        self.assertIn('do 20 KB', str(form.errors['image']))
+        extra = ProductForm({'name': 'Too large', 'price': 10}, {'additional_images': [upload(Image.effect_noise((400, 300), 70).convert('RGB'))]})
+        self.assertFalse(extra.is_valid())
+        self.assertIn('additional_images', extra.errors)
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            product = Product.objects.create(name='Direct', price=10)
+            with self.assertRaises(ValidationError):
+                product.image = original
+                product.save()
+            with self.assertRaises(ValidationError):
+                ProductImage.objects.create(product=product, image=original)
+
+    def test_existing_large_image_is_kept_during_unrelated_edit(self):
+        product = Product.objects.create(name='Existing', price=10, image='products/existing.jpg')
+        product.name = 'Renamed'
+        product.save()
+        product.refresh_from_db()
+        self.assertEqual(product.image.name, 'products/existing.jpg')

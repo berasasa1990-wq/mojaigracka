@@ -33,12 +33,12 @@ class MultipleProductImagesField(forms.FileField):
     widget = MultipleImageInput(attrs={'accept': 'image/png,image/jpeg,image/webp,image/gif,image/avif'})
 
     def clean(self, data, initial=None):
-        from .image_uploads import optimize_image
+        from .image_uploads import optimize_image, MAX_PRODUCT_IMAGE_BYTES
         files = data if isinstance(data, (list, tuple)) else ([data] if data else [])
         if len(files) > 6:
             raise forms.ValidationError('Dodajte najviše 6 slika odjednom.')
         return [optimize_image(super(MultipleProductImagesField, self).clean(file),
-                               max_bytes=30_000, max_side=1600, quality=80)
+                               max_original_bytes=MAX_PRODUCT_IMAGE_BYTES)
                 for file in files]
 
 
@@ -56,7 +56,7 @@ class ProductForm(forms.ModelForm):
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
 
     additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
-        help_text='Odaberite više slika, najviše 6 odjednom. Originalni format i kvalitet ostaju sačuvani; do 20 MB po slici. Prikazuju se lijevo od glavne slike.')
+        help_text='Odaberite više slika, najviše 6 odjednom. Originalni format i kvalitet ostaju sačuvani; do 20 KB po slici. Prikazuju se lijevo od glavne slike.')
 
     @property
     def gallery_images(self):

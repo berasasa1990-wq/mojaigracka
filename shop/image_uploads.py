@@ -17,6 +17,7 @@ UPLOAD_HELP = 'Slika se automatski sprema kao AVIF do 15 KB. Po potrebi se smanj
 logger = logging.getLogger(__name__)
 MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_PRODUCT_IMAGE_BYTES = 20_000
 MAX_BANNER_BYTES = 150_000
 BANNER_IMAGE_OPTIONS = {
     "max_bytes": MAX_BANNER_BYTES, "max_side": 1920, "prefer_webp": False, "quality": None,
@@ -30,11 +31,13 @@ def _encode(image, format, **options):
     return output.getvalue()
 
 
-def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False):
+def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False, max_original_bytes=None):
     """Validate an upload without changing its original format, bytes or dimensions.
 
     Legacy optimization arguments remain accepted for migration/API compatibility.
     """
+    if max_original_bytes is not None and upload.size > max_original_bytes:
+        raise ValidationError('Slika artikla mora biti do 20 KB. Pripremite manji fajl; format i kvalitet se ne mijenjaju automatski.')
     if getattr(upload, '_validated_original_image', False):
         return upload
     started = time.monotonic()
@@ -64,7 +67,8 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
 
 
 class AVIFUploadFormField(forms.FileField):
-    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, quality=None, preserve_quality=False, **kwargs):
+    def __init__(self, *args, max_bytes=MAX_IMAGE_BYTES, max_side=None, prefer_webp=False, quality=None, preserve_quality=False, max_original_bytes=None, **kwargs):
+        self.max_original_bytes = max_original_bytes
         self.max_bytes = max_bytes
         self.max_side = max_side
         self.prefer_webp = prefer_webp
@@ -76,7 +80,7 @@ class AVIFUploadFormField(forms.FileField):
     def clean(self, data, initial=None):
         value = super().clean(data, initial)
         if value and value is not initial:
-            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp, quality=self.quality, preserve_quality=self.preserve_quality)
+            return optimize_image(value, self.max_bytes, max_side=self.max_side, prefer_webp=self.prefer_webp, quality=self.quality, preserve_quality=self.preserve_quality, max_original_bytes=self.max_original_bytes)
         return value
 
 
@@ -96,7 +100,9 @@ class AVIFFileField(models.FileField):
         return super().formfield(**{
             'form_class': AVIFUploadFormField, 'max_bytes': self.max_bytes,
             **self.optimization_options(),
-            'help_text': 'Originalni format, kvalitet i dimenzije ostaju sačuvani. Do 20 MB i 12 megapiksela.',
+            'help_text': ('Slika artikla do 20 KB. Originalni format, kvalitet i dimenzije ostaju sačuvani.'
+                          if self.optimization_options().get('max_original_bytes') else
+                          'Originalni format, kvalitet i dimenzije ostaju sačuvani. Do 20 MB i 12 megapiksela.'),
             **kwargs,
         })
 
@@ -104,8 +110,7 @@ class AVIFFileField(models.FileField):
         if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) == 'shop.banner':
             return dict(BANNER_IMAGE_OPTIONS)
         if (instance._meta.label_lower if instance is not None else self.model._meta.label_lower) in ('shop.product', 'shop.productimage'):
-            return {'max_bytes': 30_000, 'max_side': 1600, 'prefer_webp': False,
-                    'quality': 80, 'preserve_quality': False}
+            return {'max_original_bytes': MAX_PRODUCT_IMAGE_BYTES}
         return {'max_bytes': 1_000_000, 'max_side': 1024 if self.name == 'logo' else 1920,
                 'prefer_webp': self.name == 'logo', 'quality': 85, 'preserve_quality': True}
 

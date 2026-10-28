@@ -6,8 +6,10 @@ WebP ostaje WebP, GIF ostaje GIF i AVIF ostaje AVIF. Animacije ostaju sačuvane.
 Važi za artikle, dodatne slike, bannere, kategorije, logotipe i brendove.
 SEO uploadovi i ranije su čuvali originale.
 
-Provjerava se ispravnost datoteke, najviše 20 MB i 12 megapiksela. Prethodni
-izlazni limiti od 30/150 KB i ograničenje duže strane više se ne primjenjuju.
+Slike artikala i dodatne slike imaju limit 20.000 bajtova po fajlu, bez konverzije
+ili smanjivanja kvaliteta. Veći fajl vraća grešku forme/modela. Ostale slike
+imaju limit 20 MB; za sve ostaje najviše 12 megapiksela. Prethodni izlazni
+limiti od 30/150 KB i ograničenje duže strane više se ne primjenjuju.
 Legacy imena AVIFFileField i optimize_image te field metapodaci ostaju radi
 kompatibilnosti postojećih migracija; runtime više ne poziva encoder.
 Nije potrebna nova migracija baze.
