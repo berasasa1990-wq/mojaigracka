@@ -37,7 +37,7 @@ def _encode(image, format, **options):
 
 
 def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False):
-    """Bound encoder work; banners use AVIF only, other images allow fallback."""
+    """Bound encoder work; banners use fast WebP, other images allow fallback."""
     max_side = max_side or (1280 if max_bytes > MAX_IMAGE_BYTES else 960)
     policy = (max_bytes, max_side, prefer_webp, quality, preserve_quality)
     if getattr(upload, '_optimized_image', None) == policy and upload.size <= max_bytes:
@@ -47,21 +47,6 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
     outcome = 'invalid'
     result_format = '-'
     try:
-        if upload.size > MAX_UPLOAD_BYTES:
-            raise ValidationError('Slika je prevelika. Najveća veličina uploada je 20 MB.')
-        upload.seek(0)
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(upload) as source:
-                if source.width * source.height > MAX_SOURCE_PIXELS:
-                    raise ValidationError('Slika je prevelike rezolucije. Najviše 12 megapiksela.')
-                source.seek(0)  # Keep the existing first-frame animation policy.
-                source.draft('RGB', (max_side, max_side))  # JPEG decoder downsampling.
-                source.thumbnail((max_side, max_side), Image.Resampling.LANCZOS, reducing_gap=3)
-                transposed = ImageOps.exif_transpose(source)
-                image = transposed.convert('RGBA' if transposed.has_transparency_data else 'RGB')
-        image.info.clear()
-
         def finish(data, format):
             nonlocal outcome, result_format
             extension, content_type = FORMAT_DETAILS[format]
@@ -70,6 +55,29 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
             result._optimized_image = policy
             outcome, result_format = 'ok', format
             return result
+
+        if upload.size > MAX_UPLOAD_BYTES:
+            raise ValidationError('Slika je prevelika. Najveća veličina uploada je 20 MB.')
+        upload.seek(0)
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(upload) as source:
+                if source.width * source.height > MAX_SOURCE_PIXELS:
+                    raise ValidationError('Slika je prevelike rezolucije. Najviše 12 megapiksela.')
+                if (max_bytes == MAX_BANNER_BYTES and source.format == 'AVIF'
+                        and getattr(source, 'n_frames', 1) == 1):
+                    if upload.size > max_bytes:
+                        raise ValidationError('Pripremljeni AVIF banner mora biti do 150 KB. Smanjite ga prije uploada.')
+                    # Validate decoding, then preserve the prepared original byte for byte.
+                    source.load()
+                    upload.seek(0)
+                    return finish(upload.read(), 'AVIF')
+                source.seek(0)  # Keep the existing first-frame animation policy.
+                source.draft('RGB', (max_side, max_side))  # JPEG decoder downsampling.
+                source.thumbnail((max_side, max_side), Image.Resampling.LANCZOS, reducing_gap=3)
+                transposed = ImageOps.exif_transpose(source)
+                image = transposed.convert('RGBA' if transposed.has_transparency_data else 'RGB')
+        image.info.clear()
 
         if max_bytes == 30_000 and features.check('avif'):
             # Prefer AVIF's compression for product detail, with bounded CPU work.
@@ -87,11 +95,11 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
                     image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
 
-        # All banner fields require AVIF. Bound fast encoder work per image;
+        # Banners use fast WebP to reduce CPU time in synchronous uploads. Bound fast encoder work per image;
         # prefer full resolution at high quality before adapting dimensions.
         if max_bytes == MAX_BANNER_BYTES:
-            if not features.check('avif'):
-                raise ValidationError('AVIF obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
+            if not features.check('webp'):
+                raise ValidationError('WebP obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
             original = image
             for banner_attempt in range(MAX_BANNER_ATTEMPTS):
                 # A native encode cannot be interrupted here; stop further attempts
@@ -100,14 +108,14 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     raise ValidationError('Obrada bannera traje predugo. Pokušajte s manjom izvornom slikom.')
                 attempts += 1
                 try:
-                    data = _encode(image, 'AVIF', quality=90 if banner_attempt == 0 else 85,
-                                   speed=10, max_threads=1)
+                    data = _encode(image, 'WEBP', quality=90 if banner_attempt == 0 else 85,
+                                   method=0, alpha_quality=100, exact=True)
                 except (OSError, ValueError, RuntimeError):
-                    logger.warning('image_encode banner_avif_failed elapsed_ms=%.1f',
+                    logger.warning('image_encode banner_webp_failed elapsed_ms=%.1f',
                                    (time.monotonic() - started) * 1000)
-                    raise ValidationError('AVIF obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
+                    raise ValidationError('WebP obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
                 if len(data) <= max_bytes:
-                    return finish(data, 'AVIF')
+                    return finish(data, 'WEBP')
                 if banner_attempt == 0:
                     continue  # Try high quality at full resolution before resizing.
                 scale = min(.95, max(.25, (max_bytes / len(data)) ** .5 * .98))

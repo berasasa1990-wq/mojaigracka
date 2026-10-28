@@ -106,12 +106,13 @@ Promjena važi za nove uploadove; postojeće datoteke nisu izmijenjene.
 
 ## Aktuelni banner profil: različite dimenzije, do 150 KB
 
-Sve pozicije i obje slike bannera koriste AVIF do 150.000 bajtova po slici.
+Sve pozicije i obje slike bannera koriste WebP do 150.000 bajtova po slici.
 Prihvataju se široki, uspravni i kvadratni originali unutar postojećih ulaznih
 limita (20 MiB / 12 megapiksela). Duža strana je najviše 1920 px; male slike
 se ne povećavaju. Omjer stranica i transparentnost ostaju sačuvani.
 
-Najviše četiri AVIF pokušaja koristi quality=90 pa 85, speed=10 i max_threads=1.
+Najviše četiri WebP pokušaja koristi quality=90 pa 85, method=0,
+alpha_quality=100 i exact=True.
 Prva dva pokušaja čuvaju punu pripremljenu rezoluciju prije smanjivanja.
 Ako rezultat prelazi limit, smanjuju se dimenzije, uz ponovno uzorkovanje iz
 prvobitno pripremljene slike da se izbjegne gubitak uslijed ponovljenog resizanja.
@@ -124,7 +125,7 @@ zahtijevaju ponovni upload originala. Nije potrebna migracija baze.
 Ovaj profil zamjenjuje ranije opisane banner limite od 80, 90 i 100 KB.
 
 Banneri se prikazuju u prirodnom omjeru, punom širinom svog kontejnera, bez
-nametnutog aspect-ratio i praznih bočnih traka. AVIF speed=10 smanjuje CPU
+nametnutog aspect-ratio i praznih bočnih traka. WebP method=0 smanjuje CPU
 trošak sinhronog uploada. Limit je i dalje 150 KB. Ranije umanjene slike zahtijevaju novi upload originala.
 
 
@@ -143,3 +144,35 @@ speed=4 3,720 s; speed=10 0,125 s. Cijeli novi pipeline 0,336 s, rezultat
 107.405 bajtova. Ovo nije mjerenje na Renderu niti garancija trajanja za svaki
 upload. 31 test bannera i obrade slika prolazi, uključujući prekid ponovljenih
 pokušaja kada je potrošen vremenski budžet.
+
+
+### Daljnje smanjenje CPU troška bannera
+
+Novi banner uploadovi sada koriste brzi WebP method=0 umjesto AVIF-a.
+Ovo zamjenjuje AVIF profil iz prethodnog odjeljka o timeoutu. Budžet 150 KB,
+rezolucija do 1920 px, kvalitet 90/85, najviše četiri pokušaja i provjera
+proteklog vremena ostaju. Transparentnost se čuva preko alpha_quality=100 i
+exact=True. Postojeći AVIF fajlovi ostaju čitljivi i nisu promijenjeni.
+
+Lokalno poređenje jednog quality=90 enkodiranja istog sintetičkog RGB uzorka
+1920×720: AVIF speed=10 CPU 0,134 s; WebP method=0 CPU 0,078 s. Ovo su vremena
+samog enkodiranja, a ne garancija Render vremena ili rezultata ispod limita.
+Ukupno 31 test bannera i obrade slika prolazi. Nije potrebna DB migracija.
+
+Obrada slika je i dalje sinhrona i nije uvedeno ograničenje CPU procenta:
+kratak vrh na 100% ostaje moguć. Cilj je skratiti trajanje opterećenja. Za
+premještanje cijelog troška van web procesa trebala bi odvojena obrada; nije
+dodavana infrastruktura za red poslova u ovoj izmjeni.
+
+
+### Unaprijed pripremljen AVIF banner
+
+Statični AVIF banner do 150.000 bajtova prolazi provjeru ispravnosti i ulazni
+limit od 12 megapiksela, zatim se sprema neizmijenjen: iste bajtove, dimenzije,
+kvalitet i transparentnost. Nema enkodiranja ni smanjivanja na 1920 px u ovom
+slučaju. Limit od 1920 px ostaje za slike koje server automatski obrađuje.
+Prevelik pripremljeni AVIF vraća jasnu grešku da ga treba smanjiti prije uploada.
+Ostali formati i animacije koriste postojeći brzi WebP / prvi kadar profil.
+Provjera AVIF-a uključuje dekodiranje i upload u storage, pa CPU trošak nije nula.
+Test provjerava da forma i model zajedno ne pozovu encoder i da spremljena
+AVIF datoteka bude identična originalu. Ukupno 33 testa bannera/uploadova prolazi.

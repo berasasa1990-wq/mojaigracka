@@ -114,7 +114,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in BANNER_IMAGE_OPTIONS.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'AVIF do 150 KB po slici. Različiti omjeri i rezolucije automatski se prilagođavaju, uz visok kvalitet (AVIF 85–90) i očuvanu transparentnost. Preporučeno 1920 × 720 px.'
+            self.fields[name].help_text = 'Pripremljeni AVIF do 150 KB sprema se bez konverzije i promjene kvaliteta ili dimenzija. Ostale slike automatski se optimizuju u WebP do 150 KB. Preporučena širina 1920 px.'
 
     def clean(self):
         data = super().clean()
