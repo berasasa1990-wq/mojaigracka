@@ -120,7 +120,7 @@ class HeroBannerTests(TestCase):
             attempts = encode.call_count
             banner = form.save()
             self.assertEqual(encode.call_count, attempts)
-            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 6)
+            self.assertLessEqual(sum(call.args[1] == 'AVIF' for call in encode.call_args_list), 4)
             self.assertLessEqual(banner.image.size, 150_000)
             with banner.image.open('rb') as file, Image.open(file) as image:
                 self.assertEqual(image.size, (1920, 720))
@@ -178,13 +178,13 @@ class HeroBannerTests(TestCase):
                               {'image': upload(Image.new('RGB', (1920, 720), 'red'))})
             self.assertFalse(form.is_valid())
             self.assertIn('image', form.errors)
-            self.assertEqual(encode.call_count, 6)
+            self.assertEqual(encode.call_count, 4)
             self.assertEqual(encode.call_args_list[0].args[0].size, (1920, 720))
             self.assertLess(encode.call_args_list[-1].args[0].width, 1920)
             self.assertEqual(encode.call_args_list[1].args[0].size, (1920, 720))
             for index, call in enumerate(encode.call_args_list):
                 self.assertEqual(call.kwargs['quality'], 90 if index == 0 else 85)
-                self.assertEqual(call.kwargs['speed'], 4)
+                self.assertEqual(call.kwargs['speed'], 10)
                 self.assertEqual(call.kwargs['max_threads'], 1)
 
     def test_large_detailed_banner_is_automatically_fitted_to_150kb(self):
@@ -210,3 +210,21 @@ class HeroBannerTests(TestCase):
                     with banner.image.open('rb') as file, Image.open(file) as image:
                         self.assertAlmostEqual(image.width / image.height, size[0] / size[1], delta=.01)
                         self.assertEqual(image.getpixel((0, 0))[3], 120)
+
+    def test_slow_banner_stops_further_encodes_with_form_error(self):
+        from unittest.mock import patch
+        from . import image_uploads
+        from PIL import Image
+        clock = [0.0]
+
+        def slow_encode(*args, **kwargs):
+            clock[0] += image_uploads.BANNER_ENCODING_SECONDS + 1
+            return b'x' * 150_001
+
+        with patch('shop.image_uploads.time.monotonic', side_effect=lambda: clock[0]), \
+                patch('shop.image_uploads._encode', side_effect=slow_encode) as encode:
+            form = BannerForm({'position': 'hero', 'title': 'Slow'},
+                              {'image': upload(Image.new('RGB', (1920, 720), 'red'))})
+            self.assertFalse(form.is_valid())
+            self.assertIn('traje predugo', str(form.errors['image']))
+            self.assertEqual(encode.call_count, 1)

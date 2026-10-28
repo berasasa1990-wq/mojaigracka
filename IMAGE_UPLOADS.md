@@ -111,7 +111,7 @@ Prihvataju se široki, uspravni i kvadratni originali unutar postojećih ulaznih
 limita (20 MiB / 12 megapiksela). Duža strana je najviše 1920 px; male slike
 se ne povećavaju. Omjer stranica i transparentnost ostaju sačuvani.
 
-Najviše šest AVIF pokušaja koristi quality=90 pa 85, speed=4 i max_threads=1.
+Najviše četiri AVIF pokušaja koristi quality=90 pa 85, speed=10 i max_threads=1.
 Prva dva pokušaja čuvaju punu pripremljenu rezoluciju prije smanjivanja.
 Ako rezultat prelazi limit, smanjuju se dimenzije, uz ponovno uzorkovanje iz
 prvobitno pripremljene slike da se izbjegne gubitak uslijed ponovljenog resizanja.
@@ -124,6 +124,22 @@ zahtijevaju ponovni upload originala. Nije potrebna migracija baze.
 Ovaj profil zamjenjuje ranije opisane banner limite od 80, 90 i 100 KB.
 
 Banneri se prikazuju u prirodnom omjeru, punom širinom svog kontejnera, bez
-nametnutog aspect-ratio i praznih bočnih traka. AVIF speed=4 daje efikasniju
-kompresiju prije smanjivanja rezolucije; upload može trajati duže. Limit je
-i dalje 150 KB. Ranije umanjene slike zahtijevaju novi upload originala.
+nametnutog aspect-ratio i praznih bočnih traka. AVIF speed=10 smanjuje CPU
+trošak sinhronog uploada. Limit je i dalje 150 KB. Ranije umanjene slike zahtijevaju novi upload originala.
+
+
+### Prekid uploada na Renderu (28.10.2026.)
+
+Dostavljeni log prikazuje WORKER TIMEOUT prije SIGKILL. Poruka „Perhaps out of
+memory?“ nije sama po sebi potvrda OOM-a. Spori speed=4 profil zamijenjen je
+brzim speed=10, uz iste quality=90/85, jednu nit i najviše četiri pokušaja.
+Prije svakog pokušaja provjerava se proteklo vrijeme: nakon pet sekundi od
+početka obrade forma odbija daljnje pokušaje. Već započeti nativni codec poziv
+ne može se time prekinuti, pa pet sekundi nije strogi ukupni timeout. Vrijeme
+slanja u R2 nije dio ove provjere. Nisu mijenjani Gunicorn timeout ni memorija.
+
+Lokalni sintetički uzorak 1920×720 (šum, RGB), jedan AVIF quality=90:
+speed=4 3,720 s; speed=10 0,125 s. Cijeli novi pipeline 0,336 s, rezultat
+107.405 bajtova. Ovo nije mjerenje na Renderu niti garancija trajanja za svaki
+upload. 31 test bannera i obrade slika prolazi, uključujući prekid ponovljenih
+pokušaja kada je potrošen vremenski budžet.

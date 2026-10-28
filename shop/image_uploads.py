@@ -21,6 +21,8 @@ MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_FALLBACK_ATTEMPTS = 8
 MAX_BANNER_BYTES = 150_000
+MAX_BANNER_ATTEMPTS = 4
+BANNER_ENCODING_SECONDS = 5
 BANNER_IMAGE_OPTIONS = {
     "max_bytes": MAX_BANNER_BYTES, "max_side": 1920, "prefer_webp": False, "quality": None,
 }
@@ -85,17 +87,21 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
                     image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
 
-        # All banner fields require AVIF. Bound work to six encodes;
+        # All banner fields require AVIF. Bound fast encoder work per image;
         # prefer full resolution at high quality before adapting dimensions.
         if max_bytes == MAX_BANNER_BYTES:
             if not features.check('avif'):
                 raise ValidationError('AVIF obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
             original = image
-            for banner_attempt in range(6):
+            for banner_attempt in range(MAX_BANNER_ATTEMPTS):
+                # A native encode cannot be interrupted here; stop further attempts
+                # before a slow upload monopolizes the synchronous web worker.
+                if time.monotonic() - started >= BANNER_ENCODING_SECONDS:
+                    raise ValidationError('Obrada bannera traje predugo. Pokušajte s manjom izvornom slikom.')
                 attempts += 1
                 try:
                     data = _encode(image, 'AVIF', quality=90 if banner_attempt == 0 else 85,
-                                   speed=4, max_threads=1)
+                                   speed=10, max_threads=1)
                 except (OSError, ValueError, RuntimeError):
                     logger.warning('image_encode banner_avif_failed elapsed_ms=%.1f',
                                    (time.monotonic() - started) * 1000)
