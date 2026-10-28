@@ -129,22 +129,39 @@ class ImageUploadTests(TestCase):
             self.assertNotIn('\n', product.image.name)
 
 
-    def test_product_images_over_20kb_are_rejected_without_quality_loss(self):
-        original = upload(Image.effect_noise((400, 300), 70).convert('RGB'))
-        self.assertGreater(original.size, 20_000)
-        form = ProductForm({'name': 'Too large', 'price': 10}, {'image': original})
-        self.assertFalse(form.is_valid())
-        self.assertIn('do 20 KB', str(form.errors['image']))
-        extra = ProductForm({'name': 'Too large', 'price': 10}, {'additional_images': [upload(Image.effect_noise((400, 300), 70).convert('RGB'))]})
-        self.assertFalse(extra.is_valid())
-        self.assertIn('additional_images', extra.errors)
+    def test_larger_product_uploads_are_fitted_to_20kb_in_the_same_format(self):
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
-            product = Product.objects.create(name='Direct', price=10)
-            with self.assertRaises(ValidationError):
-                product.image = original
-                product.save()
-            with self.assertRaises(ValidationError):
-                ProductImage.objects.create(product=product, image=original)
+            for format in ('PNG', 'JPEG', 'WEBP', 'AVIF', 'GIF'):
+                source = upload(Image.effect_noise((900, 600), 70).convert('RGB'), format)
+                self.assertGreater(source.size, 20_000)
+                with self.subTest(format=format):
+                    form = ProductForm({'name': format, 'price': 10, 'is_active': 'on'}, {'image': source})
+                    self.assertTrue(form.is_valid(), form.errors)
+                    product = form.save()
+                    self.assertLessEqual(product.image.size, 20_000)
+                    with product.image.open('rb') as file, Image.open(file) as image:
+                        self.assertEqual(image.format, format)
+                        self.assertAlmostEqual(image.width / image.height, 1.5, delta=.02)
+            form = ProductForm({'name': 'Extra', 'price': 10}, {
+                'additional_images': [upload(Image.effect_noise((900, 600), 70).convert('RGB'))]})
+            self.assertTrue(form.is_valid(), form.errors)
+            product = form.save()
+            self.assertLessEqual(product.additional_images.get().image.size, 20_000)
+
+    def test_direct_uploads_obey_limit_and_form_save_does_not_encode_twice(self):
+        from . import image_uploads
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            product = Product.objects.create(name='Direct', price=10,
+                image=upload(Image.effect_noise((900, 600), 70).convert('RGB')))
+            self.assertLessEqual(product.image.size, 20_000)
+            with patch('shop.image_uploads._encode', wraps=image_uploads._encode) as encode:
+                form = ProductForm({'name': 'Once', 'price': 10}, {
+                    'image': upload(Image.effect_noise((900, 600), 70).convert('RGB'))})
+                self.assertTrue(form.is_valid(), form.errors)
+                count = encode.call_count
+                self.assertGreater(count, 0)
+                form.save()
+                self.assertEqual(encode.call_count, count)
 
     def test_existing_large_image_is_kept_during_unrelated_edit(self):
         product = Product.objects.create(name='Existing', price=10, image='products/existing.jpg')
@@ -152,3 +169,28 @@ class ImageUploadTests(TestCase):
         product.save()
         product.refresh_from_db()
         self.assertEqual(product.image.name, 'products/existing.jpg')
+
+
+    def test_fitting_preserves_transparency_and_animated_gif_frames(self):
+        rgba = Image.effect_noise((600, 400), 70).convert('RGBA')
+        rgba.putalpha(120)
+        result = optimize_image(upload(rgba), max_original_bytes=20_000)
+        self.assertLessEqual(result.size, 20_000)
+        with Image.open(result) as image:
+            self.assertEqual(image.getpixel((0, 0))[3], 120)
+        frames = [Image.effect_noise((400, 300), noise).convert('RGB') for noise in (30, 90)]
+        output = BytesIO()
+        frames[0].save(output, format='GIF', save_all=True, append_images=frames[1:], duration=200, loop=0)
+        result = optimize_image(SimpleUploadedFile('animated.gif', output.getvalue()), max_original_bytes=20_000)
+        self.assertLessEqual(result.size, 20_000)
+        with Image.open(result) as image:
+            self.assertEqual(image.format, 'GIF')
+            self.assertEqual(image.n_frames, 2)
+
+    def test_failed_size_fit_is_a_form_error_and_never_saves_oversized_data(self):
+        with patch('shop.image_uploads._encode', return_value=b'x' * 20_001) as encode:
+            form = ProductForm({'name': 'Cannot fit', 'price': 10}, {
+                'image': upload(Image.effect_noise((400, 300), 70).convert('RGB'))})
+            self.assertFalse(form.is_valid())
+            self.assertIn('image', form.errors)
+            self.assertLessEqual(encode.call_count, 8)

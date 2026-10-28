@@ -56,7 +56,7 @@ class ProductForm(forms.ModelForm):
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
 
     additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
-        help_text='Odaberite više slika, najviše 6 odjednom. Originalni format i kvalitet ostaju sačuvani; do 20 KB po slici. Prikazuju se lijevo od glavne slike.')
+        help_text='Odaberite više slika, najviše 6 odjednom. Automatsko smanjivanje na najviše 20 KB po slici, uz isti format i što bolji kvalitet. Prikazuju se lijevo od glavne slike.')
 
     @property
     def gallery_images(self):

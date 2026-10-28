@@ -1,4 +1,4 @@
-"""Validate image uploads while preserving their original file contents."""
+"""Preserve source formats; fit product artwork to its storage byte budget."""
 from io import BytesIO
 import warnings
 import logging
@@ -7,7 +7,8 @@ import time
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
+from django.core.files.base import ContentFile
 
 MAX_IMAGE_BYTES = 15_000
 # Retain legacy field metadata for migration compatibility; forms show current formats.
@@ -31,14 +32,62 @@ def _encode(image, format, **options):
     return output.getvalue()
 
 
+def _fit_product_image(upload, limit):
+    """Bounded encoding in the source format; never store an oversized result."""
+    started = time.monotonic()
+    upload.seek(0)
+    with Image.open(upload) as source:
+        format = source.format
+        count = getattr(source, 'n_frames', 1)
+        if source.width * source.height * count > MAX_SOURCE_PIXELS:
+            raise ValidationError('Animacija je prevelika za obradu. Najviše 12 megapiksela ukupno.')
+        originals, durations = [], []
+        loop = source.info.get('loop', 0)
+        for index in range(count):
+            source.seek(index)
+            frame = ImageOps.exif_transpose(source).convert('RGBA' if source.has_transparency_data else 'RGB')
+            frame.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            frame.info.clear()
+            originals.append(frame)
+            durations.append(source.info.get('duration', 100))
+    frames = originals
+    for attempt in range(8):
+        if time.monotonic() - started > 5:
+            raise ValidationError('Obrada slike traje predugo. Pokušajte s manjom izvornom slikom.')
+        quality = 90 if attempt == 0 else 85
+        options = {}
+        if format == 'JPEG':
+            options = {'quality': quality, 'optimize': False}
+        elif format == 'WEBP':
+            options = {'quality': quality, 'method': 0, 'alpha_quality': 100, 'exact': True}
+        elif format == 'AVIF':
+            options = {'quality': quality, 'speed': 10, 'max_threads': 1}
+        elif format == 'PNG':
+            options = {'compress_level': 6}
+        if len(frames) > 1:
+            options.update(save_all=True, append_images=frames[1:], duration=durations, loop=loop)
+        data = _encode(frames[0], format, **options)
+        if len(data) <= limit:
+            result = ContentFile(data, name=upload.name)
+            result.content_type = Image.MIME.get(format, 'application/octet-stream')
+            result._validated_original_image = True
+            return result
+        # First compare two high quality settings before reducing lossy formats.
+        if attempt == 0 and format in ('JPEG', 'WEBP', 'AVIF'):
+            continue
+        scale = min(.9, max(.2, (limit / len(data)) ** .5 * .92))
+        size = tuple(max(1, int(n * scale)) for n in frames[0].size)
+        frames = [frame.resize(size, Image.Resampling.LANCZOS) for frame in originals]
+    raise ValidationError('Slika se ne može obraditi do 20 KB. Pokušajte s jednostavnijom slikom.')
+
+
 def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False, max_original_bytes=None):
-    """Validate an upload without changing its original format, bytes or dimensions.
+    """Validate originals and fit oversized product images in their source format.
 
     Legacy optimization arguments remain accepted for migration/API compatibility.
     """
-    if max_original_bytes is not None and upload.size > max_original_bytes:
-        raise ValidationError('Slika artikla mora biti do 20 KB. Pripremite manji fajl; format i kvalitet se ne mijenjaju automatski.')
-    if getattr(upload, '_validated_original_image', False):
+    if (getattr(upload, '_validated_original_image', False)
+            and (max_original_bytes is None or upload.size <= max_original_bytes)):
         return upload
     started = time.monotonic()
     try:
@@ -54,6 +103,8 @@ def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_w
                     raise ValidationError('Slika je prevelike rezolucije. Najviše 12 megapiksela.')
                 upload.content_type = Image.MIME.get(source.format, 'application/octet-stream')
                 source.verify()
+        if max_original_bytes is not None and upload.size > max_original_bytes:
+            return _fit_product_image(upload, max_original_bytes)
         upload._validated_original_image = True
         return upload
     except (UnidentifiedImageError, OSError, ValueError, RuntimeError,
@@ -100,7 +151,7 @@ class AVIFFileField(models.FileField):
         return super().formfield(**{
             'form_class': AVIFUploadFormField, 'max_bytes': self.max_bytes,
             **self.optimization_options(),
-            'help_text': ('Slika artikla do 20 KB. Originalni format, kvalitet i dimenzije ostaju sačuvani.'
+            'help_text': ('Veća slika automatski se smanjuje na najviše 20 KB, u istom formatu. Po potrebi se smanjuju dimenzije; čuva se što bolji kvalitet.'
                           if self.optimization_options().get('max_original_bytes') else
                           'Originalni format, kvalitet i dimenzije ostaju sačuvani. Do 20 MB i 12 megapiksela.'),
             **kwargs,

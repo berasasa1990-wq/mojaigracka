@@ -1,17 +1,20 @@
 # Aktuelno pravilo: sačuvaj originalnu sliku
 
-Svi novi uploadovi čuvaju originalni format i sadržaj datoteke, bez kompresije,
-konverzije, resizanja ili uklanjanja metapodataka. PNG ostaje PNG, JPG ostaje JPG,
+Svi novi uploadovi čuvaju originalni format. Artikli veći od 20 KB se kompresuju
+i po potrebi smanjuju; ostale slike čuvaju originalni sadržaj bez obrade. PNG ostaje PNG, JPG ostaje JPG,
 WebP ostaje WebP, GIF ostaje GIF i AVIF ostaje AVIF. Animacije ostaju sačuvane.
 Važi za artikle, dodatne slike, bannere, kategorije, logotipe i brendove.
 SEO uploadovi i ranije su čuvali originale.
 
-Slike artikala i dodatne slike imaju limit 20.000 bajtova po fajlu, bez konverzije
-ili smanjivanja kvaliteta. Veći fajl vraća grešku forme/modela. Ostale slike
+Slike artikala i dodatne slike automatski se obrađuju do 20.000 bajtova po fajlu
+u istom formatu. Veći upload se prihvata unutar ulaznih limita; algoritam prvo
+pokušava visoki kvalitet, a zatim po potrebi smanjuje rezoluciju. Potpuno isti
+kvalitet nije moguće garantovati na proizvoljnom originalu u 20 KB. Slike koje
+već stanu u limit čuvaju se neizmijenjene. Ostale slike
 imaju limit 20 MB; za sve ostaje najviše 12 megapiksela. Prethodni izlazni
 limiti od 30/150 KB i ograničenje duže strane više se ne primjenjuju.
 Legacy imena AVIFFileField i optimize_image te field metapodaci ostaju radi
-kompatibilnosti postojećih migracija; runtime više ne poziva encoder.
+kompatibilnosti postojećih migracija; runtime poziva encoder samo za artikle koji prelaze 20 KB.
 Nije potrebna nova migracija baze.
 
 Slike artikala na stranici i pri običnom „Sačuvaj sliku“ streamaju se iz storagea
@@ -205,3 +208,18 @@ Ostali formati i animacije koriste postojeći brzi WebP / prvi kadar profil.
 Provjera AVIF-a uključuje dekodiranje i upload u storage, pa CPU trošak nije nula.
 Test provjerava da forma i model zajedno ne pozovu encoder i da spremljena
 AVIF datoteka bude identična originalu. Ukupno 33 testa bannera/uploadova prolazi.
+
+
+## Automatsko ograničenje artikala na 20 KB
+
+Ulazne slike do 20 MB i 12 megapiksela prihvataju se i obrađuju u izvornom
+formatu (PNG/JPEG/WebP/GIF/AVIF), uz najviše osam pokušaja. Prva dva pokušaja
+za lossy formate koriste kvalitet 90/85 prije smanjenja dimenzija. PNG koristi
+kompresiju bez gubitaka; po potrebi se smanjuje rezolucija. WebP method=0 i
+AVIF speed=10/jedna nit ograničavaju CPU trošak. Veliki original se za obradu
+ograničava na 1600 px po dužoj strani. Animacije zadržavaju kadrove, uz limit
+12 megapiksela ukupno. Pokušaji se prekidaju ako je već prošlo pet sekundi;
+aktivan codec poziv nije moguće time prekinuti. Ako rezultat ne stane u 20 KB,
+forma vraća grešku, umjesto spremanja prevelikog fajla. Označeni rezultat forme
+ne obrađuje se ponovo pri spremanju modela. Pravilo važi i za direktne model
+uploadove i dodatne slike. Postojeće datoteke se ne obrađuju pri običnom save().
