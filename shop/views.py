@@ -279,7 +279,7 @@ def panel(request, section=None, orders_in_wms=False):
     elif section == 'brendovi':
         rows = [{'id': b.pk, 'name': b.name, 'image_url': b.logo.url if b.logo else ''} for b in Brand.objects.all()]
     elif section == 'banneri':
-        rows = [{'id': b.pk, 'name': b.title, 'detail': b.get_position_display(), 'image_url': b.image.url if b.image else ''} for b in Banner.objects.all()]
+        rows = [{'id': b.pk, 'name': b.title, 'detail': 'Donji banner — Posebne ponude / Samo za vas · 1600 × 600 px (8:3)' if b.position == 'footer' else b.get_position_display(), 'image_url': b.image.url if b.image else ''} for b in Banner.objects.all()]
     elif section == 'akcije':
         rows = [{'id': p.pk, 'name': p.name, 'detail': f'{p.price:.2f} KM', 'image_url': p.image_thumbnail_url if p.image else ''} for p in Product.objects.filter(is_active=True).on_sale()]
     elif section == 'korisnici':

@@ -1,7 +1,7 @@
 {% load storefront_images %}
 {% load static %}
 <div class="bera-home-bottom">
-    <a class="bera-wide-promo" href="{% if footer_promo_card %}{{ footer_promo_card.url|default:'/akcije/' }}{% else %}{{ site_settings.akcija_banner_href|default:'/akcije/' }}{% endif %}">
+    <a class="bera-wide-promo{% if footer_promo_card or site_settings.akcija_banner_desktop %} bera-wide-promo--uploaded{% endif %}" href="{% if footer_promo_card %}{{ footer_promo_card.url|default:'/akcije/' }}{% else %}{{ site_settings.akcija_banner_href|default:'/akcije/' }}{% endif %}">
         {% if footer_promo_card %}
         <img class="bera-wide-promo__art" {% artwork_sources footer_promo_card 'banner' %} alt="{{ footer_promo_card.title }}" loading="lazy">
         {% elif site_settings.akcija_banner_desktop %}

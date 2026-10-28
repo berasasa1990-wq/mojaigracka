@@ -110,6 +110,11 @@ class BannerForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from .image_uploads import banner_image_options
+        self.fields['position'].choices = [
+            (value, 'Donji banner — Posebne ponude / Samo za vas' if value == 'footer' else label)
+            for value, label in Banner.POSITION_CHOICES
+        ]
+        self.fields['position'].help_text = 'Za banner „POSEBNE PONUDE / SAMO ZA VAS“ odaberite „Donji banner“. Slika: 1600 × 600 px — omjer 8:3. Prikazuje se iznad Popularnih brendova.'
         position = (self.data.get(self.add_prefix('position')) if self.is_bound
                     else self.initial.get('position', self.instance.position))
         options = banner_image_options(position)
@@ -117,7 +122,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in options.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = f'Lijevi i desni banner: preporučena dimenzija 1600 × 600 px — omjer 8:3. Banner se sprema kao WebP do {limit_kb} KB. Dimenzije se smanjuju samo ako je potrebno za veličinu fajla.'
+            self.fields[name].help_text = f'Lijevi, desni i donji banner „Posebne ponude / Samo za vas“: preporučena dimenzija 1600 × 600 px — omjer 8:3. Banner se sprema kao WebP do {limit_kb} KB. Dimenzije se smanjuju samo ako je potrebno za veličinu fajla.'
 
     def clean(self):
         data = super().clean()

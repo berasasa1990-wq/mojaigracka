@@ -15,6 +15,7 @@
   </header>
   <main class="panel-main">
     <div class="panel-intro"><p class="eyebrow">VAŠA TRGOVINA</p><h1>{% if selected %}{{ selected.title }}{% else %}Panel Sajta{% endif %}</h1><p>{% if selected %}{{ selected.description }}{% else %}Sve za vašu ponudu i izgled trgovine na jednom mjestu.{% endif %}</p></div>
+    {% if selected.slug == 'banneri' %}<p class="panel-feedback">Banner „POSEBNE PONUDE / SAMO ZA VAS“: kliknite „Dodaj“, odaberite poziciju „Donji banner — Posebne ponude / Samo za vas“ i učitajte sliku <strong>1600 × 600 px — omjer 8:3</strong>. Prikazuje se iznad Popularnih brendova. Ako već postoji, otvorite „Uredi“.</p>{% endif %}
     <nav class="panel-settings panel-settings--compact" aria-label="Podešavanje trgovine">
       {% for item in sections %}
       {% panel_module_locked item as module_locked %}
