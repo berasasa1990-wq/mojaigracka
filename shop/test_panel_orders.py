@@ -102,7 +102,7 @@ class PanelOrdersTests(TestCase):
         response = self.client.get(url, {'preview': order.pk})
         self.assertContains(response, 'Pregled kupca')
         self.assertContains(response, 'Ulica 7')
-        self.assertContains(response, 'products/preview.avif')
+        self.assertContains(response, product.image_url)
         self.assertEqual(response.context['subtotal'], 40)
         self.assertEqual(response.context['items'][0].line_total, 40)
         self.assertIn('no-store', response['Cache-Control'])

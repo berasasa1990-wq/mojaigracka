@@ -1,3 +1,30 @@
+# Aktuelno pravilo: sačuvaj originalnu sliku
+
+Svi novi uploadovi čuvaju originalni format i sadržaj datoteke, bez kompresije,
+konverzije, resizanja ili uklanjanja metapodataka. PNG ostaje PNG, JPG ostaje JPG,
+WebP ostaje WebP, GIF ostaje GIF i AVIF ostaje AVIF. Animacije ostaju sačuvane.
+Važi za artikle, dodatne slike, bannere, kategorije, logotipe i brendove.
+SEO uploadovi i ranije su čuvali originale.
+
+Provjerava se ispravnost datoteke, najviše 20 MB i 12 megapiksela. Prethodni
+izlazni limiti od 30/150 KB i ograničenje duže strane više se ne primjenjuju.
+Legacy imena AVIFFileField i optimize_image te field metapodaci ostaju radi
+kompatibilnosti postojećih migracija; runtime više ne poziva encoder.
+Nije potrebna nova migracija baze.
+
+Slike artikala na stranici i pri običnom „Sačuvaj sliku“ streamaju se iz storagea
+u izvornom formatu. Content-Disposition ostaje inline s nazivom
+„mojaigracka.com - naziv artikla“ i originalnom ekstenzijom. Nema AVIF konverzije
+pri prikazu ni preuzimanju. Posebni JPEG preview za društvene mreže je izvedena
+slika, ne zamjenjuje originalni upload.
+
+Već ranije konvertovane datoteke ne mogu povratiti originalni format i kvalitet:
+za njih je potreban novi upload originala.
+
+---
+
+Sljedeći odjeljci opisuju ranije profile i više nisu aktuelna pravila:
+
 # Upload slika na Renderu
 
 Obrada je u shop/image_uploads.py. Pipeline:

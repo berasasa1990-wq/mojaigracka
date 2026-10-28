@@ -56,7 +56,7 @@ class ProductForm(forms.ModelForm):
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
 
     additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
-        help_text='Odaberite više slika, najviše 6 odjednom. Do 30 KB po slici; prikazuju se lijevo od glavne slike.')
+        help_text='Odaberite više slika, najviše 6 odjednom. Originalni format i kvalitet ostaju sačuvani; do 20 MB po slici. Prikazuju se lijevo od glavne slike.')
 
     @property
     def gallery_images(self):
@@ -106,7 +106,7 @@ class BannerForm(forms.ModelForm):
         model = Banner
         fields = ['position', 'title', 'eyebrow', 'subtitle', 'button_text', 'features', 'image', 'secondary_image', 'url', 'is_active']
         widgets = {'title': forms.Textarea(attrs={'rows': 2})}
-        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Svi banneri: do 150 KB po slici, uz očuvanje kvaliteta koliko dozvoljava veličina fajla.'}
+        help_texts = {'image': 'Za pozicije „Glavni banner“ i „Veliki banner — ispod ponuda“ preporučena dimenzija slike je 1920 × 720 px (omjer 8:3). Prikazuje se cijela slika, bez rezanja. Svi banneri čuvaju originalni format, kvalitet i dimenzije. Do 20 MB i 12 megapiksela.'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -114,7 +114,7 @@ class BannerForm(forms.ModelForm):
         for name in ('image', 'secondary_image'):
             for option, value in BANNER_IMAGE_OPTIONS.items():
                 setattr(self.fields[name], option, value)
-            self.fields[name].help_text = 'Pripremljeni AVIF do 150 KB sprema se bez konverzije i promjene kvaliteta ili dimenzija. Ostale slike automatski se optimizuju u WebP do 150 KB. Preporučena širina 1920 px.'
+            self.fields[name].help_text = 'Slika se sprema u originalnom formatu, kvalitetu i dimenzijama. Do 20 MB i 12 megapiksela.'
 
     def clean(self):
         data = super().clean()

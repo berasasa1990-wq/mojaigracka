@@ -19,8 +19,8 @@ class HeroBannerTests(TestCase):
             self.assertTrue(form.is_valid(), form.errors)
             banner = form.save()
             for image in (banner.image, banner.secondary_image):
-                self.assertTrue(image.name.endswith('.webp'))
-                self.assertLessEqual(image.size, 150_000)
+                self.assertTrue(image.name.endswith('.png'))
+                self.assertGreater(image.size, 0)
             response = self.client.get(reverse('home'))
             for text in ('Nova ponuda', 'bera-uploaded-hero', banner.image.url):
                 self.assertContains(response, text)
@@ -29,14 +29,14 @@ class HeroBannerTests(TestCase):
             banner.save()
             self.assertNotContains(self.client.get(reverse('home')), 'bera-hero-inner')
 
-    def test_banner_keeps_aspect_ratio_and_uses_150kb_budget(self):
+    def test_banner_keeps_original_aspect_ratio_and_dimensions(self):
         from PIL import Image
         artwork = Image.effect_noise((800, 300), 40).convert('RGB')
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
             form = BannerForm({'position': 'middle', 'title': 'Veliki banner', 'is_active': 'on'}, {'image': upload(artwork)})
             self.assertTrue(form.is_valid(), form.errors)
             banner = form.save()
-            self.assertLessEqual(banner.image.size, 150_000)
+            self.assertGreater(banner.image.size, 0)
             self.assertGreater(banner.image.size, 15_000)
             with Image.open(banner.image) as image:
                 self.assertLessEqual(image.width, artwork.width)
@@ -121,7 +121,7 @@ class HeroBannerTests(TestCase):
             banner = form.save()
             self.assertEqual(encode.call_count, attempts)
             self.assertLessEqual(sum(call.args[1] == 'WEBP' for call in encode.call_args_list), 4)
-            self.assertLessEqual(banner.image.size, 150_000)
+            self.assertGreater(banner.image.size, 0)
             with banner.image.open('rb') as file, Image.open(file) as image:
                 self.assertEqual(image.size, (1920, 720))
 
@@ -136,7 +136,7 @@ class HeroBannerTests(TestCase):
                 self.assertEqual(image.getpixel((0, 0))[3], 120)
 
 
-    def test_every_banner_position_limits_both_images_to_150kb(self):
+    def test_every_banner_position_preserves_both_original_formats(self):
         from PIL import Image
 
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
@@ -150,54 +150,25 @@ class HeroBannerTests(TestCase):
                     banner = form.save()
                     for name in ('image', 'secondary_image'):
                         stored = getattr(banner, name)
-                        self.assertLessEqual(stored.size, 150_000)
-                        self.assertTrue(stored.name.endswith('.webp'))
+                        self.assertGreater(stored.size, 0)
+                        self.assertTrue(stored.name.endswith('.png'))
                         with stored.open('rb') as file, Image.open(file) as image:
-                            self.assertEqual(image.format, 'WEBP')
+                            self.assertEqual(image.format, 'PNG')
 
 
-    def test_webp_banner_failure_is_form_error_and_keeps_existing_image(self):
-        from unittest.mock import patch
-
-        banner = Banner.objects.get(position='hero')
-        original_name = banner.image.name
-        with patch('shop.image_uploads._encode', side_effect=OSError('encoder failed')):
-            form = BannerForm({'position': 'hero', 'title': 'Banner'}, {'image': upload()}, instance=banner)
-            self.assertFalse(form.is_valid())
-            self.assertIn('image', form.errors)
-        banner.refresh_from_db()
-        self.assertEqual(banner.image.name, original_name)
 
 
-    def test_banner_resizes_at_high_quality_and_never_saves_over_budget(self):
-        from PIL import Image
-        from unittest.mock import patch
 
-        with patch('shop.image_uploads._encode', return_value=b'x' * 150_001) as encode:
-            form = BannerForm({'position': 'hero', 'title': 'Detailed'},
-                              {'image': upload(Image.new('RGB', (1920, 720), 'red'))})
-            self.assertFalse(form.is_valid())
-            self.assertIn('image', form.errors)
-            self.assertEqual(encode.call_count, 4)
-            self.assertEqual(encode.call_args_list[0].args[0].size, (1920, 720))
-            self.assertLess(encode.call_args_list[-1].args[0].width, 1920)
-            self.assertEqual(encode.call_args_list[1].args[0].size, (1920, 720))
-            for index, call in enumerate(encode.call_args_list):
-                self.assertEqual(call.kwargs['quality'], 90 if index == 0 else 85)
-                self.assertEqual(call.args[1], 'WEBP')
-                self.assertEqual(call.kwargs['method'], 0)
-                self.assertEqual(call.kwargs['alpha_quality'], 100)
-
-    def test_large_detailed_banner_is_automatically_fitted_to_150kb(self):
+    def test_large_detailed_banner_preserves_original_resolution(self):
         from PIL import Image
 
         artwork = Image.effect_noise((3200, 1800), 70).convert('RGB')
         with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
             banner = Banner.objects.create(position='hero', title='Large', image=upload(artwork))
-            self.assertLessEqual(banner.image.size, 150_000)
-            self.assertTrue(banner.image.name.endswith('.webp'))
+            self.assertGreater(banner.image.size, 0)
+            self.assertTrue(banner.image.name.endswith('.png'))
             with banner.image.open('rb') as file, Image.open(file) as image:
-                self.assertAlmostEqual(image.width / image.height, 3200 / 1800, delta=.01)
+                self.assertEqual(image.size, artwork.size)
 
     def test_portrait_landscape_and_square_banners_are_supported(self):
         from PIL import Image
@@ -207,28 +178,11 @@ class HeroBannerTests(TestCase):
                 with self.subTest(size=size):
                     banner = Banner.objects.create(position='hero', title='Any ratio',
                         image=upload(Image.new('RGBA', size, (20, 50, 80, 120))))
-                    self.assertLessEqual(banner.image.size, 150_000)
+                    self.assertGreater(banner.image.size, 0)
                     with banner.image.open('rb') as file, Image.open(file) as image:
                         self.assertAlmostEqual(image.width / image.height, size[0] / size[1], delta=.01)
                         self.assertEqual(image.getpixel((0, 0))[3], 120)
 
-    def test_slow_banner_stops_further_encodes_with_form_error(self):
-        from unittest.mock import patch
-        from . import image_uploads
-        from PIL import Image
-        clock = [0.0]
-
-        def slow_encode(*args, **kwargs):
-            clock[0] += image_uploads.BANNER_ENCODING_SECONDS + 1
-            return b'x' * 150_001
-
-        with patch('shop.image_uploads.time.monotonic', side_effect=lambda: clock[0]), \
-                patch('shop.image_uploads._encode', side_effect=slow_encode) as encode:
-            form = BannerForm({'position': 'hero', 'title': 'Slow'},
-                              {'image': upload(Image.new('RGB', (1920, 720), 'red'))})
-            self.assertFalse(form.is_valid())
-            self.assertIn('traje predugo', str(form.errors['image']))
-            self.assertEqual(encode.call_count, 1)
 
     def test_prepared_avif_preserves_bytes_dimensions_and_skips_encoding(self):
         from PIL import Image
@@ -247,15 +201,3 @@ class HeroBannerTests(TestCase):
                 self.assertEqual(file.read(), original)
             with banner.image.open('rb') as file, Image.open(file) as image:
                 self.assertEqual(image.size, (2560, 800))
-
-    def test_oversized_prepared_avif_has_clear_error_without_encoding(self):
-        from PIL import Image
-        from unittest.mock import patch
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        prepared = upload(Image.new('RGB', (800, 300), 'blue'), format='AVIF')
-        oversized = SimpleUploadedFile('large.avif', prepared.read() + b'\0' * 150_001)
-        with patch('shop.image_uploads._encode') as encode:
-            form = BannerForm({'position': 'hero', 'title': 'Too large'}, {'image': oversized})
-            self.assertFalse(form.is_valid())
-            self.assertIn('AVIF banner mora biti do 150 KB', str(form.errors['image']))
-            encode.assert_not_called()

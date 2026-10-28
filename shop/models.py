@@ -125,6 +125,16 @@ class Product(models.Model):
         from django.urls import reverse
         return reverse('product_detail', kwargs={'pk': self.pk})
 
+    @property
+    def image_url(self):
+        if not self.image:
+            return ''
+        if not self.is_active:
+            return self.image.url
+        from django.urls import reverse
+        from urllib.parse import urlencode
+        return reverse('product_image_download', args=[self.pk]) + '?' + urlencode({'image': self.image.name})
+
     def quantity_discount_percent(self, quantity):
         if quantity < 2 or not self.has_quantity_sale:
             return 0

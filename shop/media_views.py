@@ -97,3 +97,30 @@ def product_share_image(request, pk):
     response = HttpResponse(data, content_type='image/jpeg')
     response['Cache-Control'] = 'public, max-age=3600'
     return response
+
+
+def product_image_download(request, pk):
+    """Serve original product artwork with a branded Save Image As filename."""
+    import mimetypes
+    from botocore.exceptions import BotoCoreError, ClientError
+    from django.shortcuts import get_object_or_404
+    from .models import Product
+
+    product = get_object_or_404(Product, pk=pk, is_active=True)
+    photos = ([product.image] if product.image else []) + [p.image for p in product.additional_images.all() if p.image]
+    selected = request.GET.get('image')
+    photo = next((p for p in photos if p.name == selected), None) if selected else next(iter(photos), None)
+    if not photo:
+        raise Http404('Slika nije dostupna.')
+    try:
+        source = photo.open('rb')
+    except (OSError, BotoCoreError, ClientError):
+        raise Http404('Slika nije dostupna.') from None
+    name = re.sub(r'[\x00-\x1f\x7f/\\:*?"<>|]', ' ', product.name)
+    name = ' '.join(name.split())[:140].strip(' .') or 'artikal'
+    extension = Path(photo.name).suffix.lower()
+    response = FileResponse(source, content_type=mimetypes.guess_type(photo.name)[0] or 'application/octet-stream')
+    response['Content-Disposition'] = content_disposition_header(False, f'mojaigracka.com - {name}{extension}')
+    response['Cache-Control'] = 'public, max-age=3600'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response

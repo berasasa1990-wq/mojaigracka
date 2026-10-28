@@ -1,15 +1,13 @@
-"""Bounded, low-CPU image optimization before local or R2 storage."""
+"""Validate image uploads while preserving their original file contents."""
 from io import BytesIO
-from pathlib import Path
 import warnings
 import logging
 import time
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
 from django.db import models
-from PIL import Image, ImageOps, UnidentifiedImageError, features
+from PIL import Image, UnidentifiedImageError
 
 MAX_IMAGE_BYTES = 15_000
 # Retain legacy field metadata for migration compatibility; forms show current formats.
@@ -19,15 +17,11 @@ UPLOAD_HELP = 'Slika se automatski sprema kao AVIF do 15 KB. Po potrebi se smanj
 logger = logging.getLogger(__name__)
 MAX_SOURCE_PIXELS = 12_000_000
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-MAX_FALLBACK_ATTEMPTS = 8
 MAX_BANNER_BYTES = 150_000
-MAX_BANNER_ATTEMPTS = 4
-BANNER_ENCODING_SECONDS = 5
 BANNER_IMAGE_OPTIONS = {
     "max_bytes": MAX_BANNER_BYTES, "max_side": 1920, "prefer_webp": False, "quality": None,
 }
-FORMAT_DETAILS = {'AVIF': ('.avif', 'image/avif'), 'WEBP': ('.webp', 'image/webp'),
-                  'PNG': ('.png', 'image/png')}
+
 
 
 def _encode(image, format, **options):
@@ -37,159 +31,36 @@ def _encode(image, format, **options):
 
 
 def optimize_image(upload, max_bytes=MAX_IMAGE_BYTES, *, max_side=None, prefer_webp=False, quality=None, preserve_quality=False):
-    """Bound encoder work; banners use fast WebP, other images allow fallback."""
-    max_side = max_side or (1280 if max_bytes > MAX_IMAGE_BYTES else 960)
-    policy = (max_bytes, max_side, prefer_webp, quality, preserve_quality)
-    if getattr(upload, '_optimized_image', None) == policy and upload.size <= max_bytes:
+    """Validate an upload without changing its original format, bytes or dimensions.
+
+    Legacy optimization arguments remain accepted for migration/API compatibility.
+    """
+    if getattr(upload, '_validated_original_image', False):
         return upload
     started = time.monotonic()
-    attempts = 0
-    outcome = 'invalid'
-    result_format = '-'
     try:
-        def finish(data, format):
-            nonlocal outcome, result_format
-            extension, content_type = FORMAT_DETAILS[format]
-            result = ContentFile(data, name=Path(upload.name).stem + extension)
-            result.content_type = content_type
-            result._optimized_image = policy
-            outcome, result_format = 'ok', format
-            return result
-
         if upload.size > MAX_UPLOAD_BYTES:
             raise ValidationError('Slika je prevelika. Najveća veličina uploada je 20 MB.')
         upload.seek(0)
         with warnings.catch_warnings():
             warnings.simplefilter('error', Image.DecompressionBombWarning)
             with Image.open(upload) as source:
+                if source.format not in ('PNG', 'JPEG', 'WEBP', 'GIF', 'AVIF'):
+                    raise ValidationError('Odaberite PNG, JPG, WebP, GIF ili AVIF sliku.')
                 if source.width * source.height > MAX_SOURCE_PIXELS:
                     raise ValidationError('Slika je prevelike rezolucije. Najviše 12 megapiksela.')
-                if (max_bytes == MAX_BANNER_BYTES and source.format == 'AVIF'
-                        and getattr(source, 'n_frames', 1) == 1):
-                    if upload.size > max_bytes:
-                        raise ValidationError('Pripremljeni AVIF banner mora biti do 150 KB. Smanjite ga prije uploada.')
-                    # Validate decoding, then preserve the prepared original byte for byte.
-                    source.load()
-                    upload.seek(0)
-                    return finish(upload.read(), 'AVIF')
-                source.seek(0)  # Keep the existing first-frame animation policy.
-                source.draft('RGB', (max_side, max_side))  # JPEG decoder downsampling.
-                source.thumbnail((max_side, max_side), Image.Resampling.LANCZOS, reducing_gap=3)
-                transposed = ImageOps.exif_transpose(source)
-                image = transposed.convert('RGBA' if transposed.has_transparency_data else 'RGB')
-        image.info.clear()
-
-        if max_bytes == 30_000 and features.check('avif'):
-            # Prefer AVIF's compression for product detail, with bounded CPU work.
-            for product_quality in (80, 65, 50, 45):
-                attempts += 1
-                try:
-                    data = _encode(image, 'AVIF', quality=product_quality, speed=10, max_threads=1)
-                except (OSError, ValueError, RuntimeError):
-                    logger.warning('image_encode product_avif_failed elapsed_ms=%.1f fallback=webp_or_png',
-                                   (time.monotonic() - started) * 1000)
-                    break
-                if len(data) <= max_bytes:
-                    return finish(data, 'AVIF')
-                if product_quality in (50, 45):
-                    scale = min(.85, (max_bytes / len(data)) ** .5 * .9)
-                    image = image.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
-
-        # Banners use fast WebP to reduce CPU time in synchronous uploads. Bound fast encoder work per image;
-        # prefer full resolution at high quality before adapting dimensions.
-        if max_bytes == MAX_BANNER_BYTES:
-            if not features.check('webp'):
-                raise ValidationError('WebP obrada bannera nije dostupna. Pokušajte ponovo kasnije.')
-            original = image
-            for banner_attempt in range(MAX_BANNER_ATTEMPTS):
-                # A native encode cannot be interrupted here; stop further attempts
-                # before a slow upload monopolizes the synchronous web worker.
-                if time.monotonic() - started >= BANNER_ENCODING_SECONDS:
-                    raise ValidationError('Obrada bannera traje predugo. Pokušajte s manjom izvornom slikom.')
-                attempts += 1
-                try:
-                    data = _encode(image, 'WEBP', quality=90 if banner_attempt == 0 else 85,
-                                   method=0, alpha_quality=100, exact=True)
-                except (OSError, ValueError, RuntimeError):
-                    logger.warning('image_encode banner_webp_failed elapsed_ms=%.1f',
-                                   (time.monotonic() - started) * 1000)
-                    raise ValidationError('WebP obrada bannera nije uspjela. Pokušajte s drugom slikom.') from None
-                if len(data) <= max_bytes:
-                    return finish(data, 'WEBP')
-                if banner_attempt == 0:
-                    continue  # Try high quality at full resolution before resizing.
-                scale = min(.95, max(.25, (max_bytes / len(data)) ** .5 * .98))
-                image = original.resize(tuple(max(1, int(n * scale)) for n in image.size), Image.Resampling.LANCZOS)
-            raise ValidationError('Banner nije moguće obraditi do 150 KB. Odaberite drugu ispravnu sliku.')
-
-        # Preserve logo edges/alpha losslessly if a cheap PNG already fits.
-        if prefer_webp:
-            attempts += 1
-            data = _encode(image, 'PNG', compress_level=3)
-            if len(data) <= max_bytes:
-                return finish(data, 'PNG')
-
-        # Pillow 12.3 supports AVIF speed=10 (fastest). Avoid it for logos,
-        # alpha artwork and small images; no repeated AVIF quality search.
-        if max_bytes != 30_000 and not prefer_webp and image.mode == 'RGB' and max(image.size) > 512 and features.check('avif'):
-            attempts += 1
-            try:
-                data = _encode(image, 'AVIF', quality=quality or 55, speed=10, max_threads=1)
-                if len(data) <= max_bytes:
-                    return finish(data, 'AVIF')
-            except (OSError, ValueError, RuntimeError):
-                # No filenames, request data, credentials or provider errors.
-                logger.warning('image_encode avif_failed elapsed_ms=%.1f fallback=webp_or_png',
-                               (time.monotonic() - started) * 1000)
-
-        if preserve_quality:
-            # Never crush detail to meet the old 15 KB budget. Keep the decoded
-            # resolution and high quality; reject rather than silently pixelate.
-            attempts += 1
-            try:
-                if features.check('webp'):
-                    data = _encode(image, 'WEBP', quality=90, method=0,
-                                   alpha_quality=100, exact=True)
-                    format = 'WEBP'
-                else:
-                    data = _encode(image, 'PNG', compress_level=3)
-                    format = 'PNG'
-            except (OSError, ValueError, RuntimeError):
-                attempts += 1
-                data = _encode(image, 'PNG', compress_level=3)
-                format = 'PNG'
-            if len(data) <= max_bytes:
-                return finish(data, format)
-            raise ValidationError('Slika ne stane u 1 MB uz visoki kvalitet. Odaberite manje složenu sliku; kvalitet nije automatski snižen.')
-
-        fallback_format = 'WEBP' if features.check('webp') else 'PNG'
-        for attempt in range(MAX_FALLBACK_ATTEMPTS):
-            attempts += 1
-            try:
-                if fallback_format == 'WEBP':
-                    data = _encode(image, 'WEBP', quality=max(35, (quality or 85) - attempt * 10),
-                                   method=0, alpha_quality=100, exact=True)
-                else:
-                    data = _encode(image, 'PNG', compress_level=3)
-            except (OSError, ValueError, RuntimeError):
-                if fallback_format == 'PNG':
-                    raise ValidationError('Obrada slike nije uspjela. Odaberite drugu sliku.') from None
-                logger.warning('image_encode webp_failed elapsed_ms=%.1f fallback=png',
-                               (time.monotonic() - started) * 1000)
-                fallback_format = 'PNG'
-                attempts += 1
-                data = _encode(image, 'PNG', compress_level=3)
-            if len(data) <= max_bytes:
-                return finish(data, fallback_format)
-            image = image.resize(tuple(max(1, int(n * .6)) for n in image.size), Image.Resampling.LANCZOS)
-        raise ValidationError(f'Slika se ne može smanjiti na {max_bytes // 1000} KB. Odaberite drugu sliku.')
+                upload.content_type = Image.MIME.get(source.format, 'application/octet-stream')
+                source.verify()
+        upload._validated_original_image = True
+        return upload
     except (UnidentifiedImageError, OSError, ValueError, RuntimeError,
             Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise ValidationError('Odaberite ispravnu PNG, JPG, WebP, GIF ili AVIF sliku.') from None
     finally:
         upload.seek(0)
-        logger.info('image_encode outcome=%s format=%s attempts=%d elapsed_ms=%.1f',
-                    outcome, result_format, attempts, (time.monotonic() - started) * 1000)
+        logger.info('image_validate original_preserved=%s elapsed_ms=%.1f',
+                    getattr(upload, '_validated_original_image', False),
+                    (time.monotonic() - started) * 1000)
 
 
 class AVIFUploadFormField(forms.FileField):
@@ -225,7 +96,7 @@ class AVIFFileField(models.FileField):
         return super().formfield(**{
             'form_class': AVIFUploadFormField, 'max_bytes': self.max_bytes,
             **self.optimization_options(),
-            'help_text': f'Slika do {self.optimization_options().get("max_bytes", self.max_bytes) // 1000} KB, uz očuvanje detalja i transparentnosti. Animacije koriste prvu sliku.',
+            'help_text': 'Originalni format, kvalitet i dimenzije ostaju sačuvani. Do 20 MB i 12 megapiksela.',
             **kwargs,
         })
 
@@ -242,6 +113,6 @@ class AVIFFileField(models.FileField):
         file = getattr(model_instance, self.attname)
         if file and not file._committed:
             options = {'max_bytes': self.max_bytes, **self.optimization_options(model_instance)}
-            converted = optimize_image(file.file, **options)
-            setattr(model_instance, self.attname, converted)
+            validated = optimize_image(file.file, **options)
+            setattr(model_instance, self.attname, validated)
         return super().pre_save(model_instance, add)

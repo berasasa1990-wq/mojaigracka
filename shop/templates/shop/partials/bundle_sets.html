@@ -5,7 +5,7 @@
     {% for item in offer.items %}
     {% if not forloop.first %}<span class="product-bundle-plus" aria-hidden="true">+</span>{% endif %}
     <a class="product-bundle-item" href="{{ item.product.get_absolute_url }}">
-      <div class="product-bundle-photo">{% if item.product.image %}<img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" width="180" height="160" loading="lazy">{% else %}<span>Slika nije dodana.</span>{% endif %}</div>
+      <div class="product-bundle-photo">{% if item.product.image %}<img src="{{ item.product.image_url }}" alt="{{ item.product.name }}" width="180" height="160" loading="lazy">{% else %}<span>Slika nije dodana.</span>{% endif %}</div>
       <h3>{{ item.product.name }}</h3><span class="product-bundle-quantity">1 kom · Cijena u setu</span>
       <div class="product-bundle-price"><s aria-label="Stara cijena">{{ item.product.price|floatformat:2 }} KM</s><strong aria-label="Nova cijena">{{ item.price|floatformat:2 }} KM</strong></div>
     </a>

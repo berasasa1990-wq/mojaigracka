@@ -190,7 +190,7 @@ class SearchSuggestionTests(TestCase):
         Product.objects.create(name='Laptop skriven', price=20, is_active=False)
         response = self.client.get('/pretraga/prijedlozi/', {'q':'Laptop'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['products'], [{'name':p.name,'url':p.get_absolute_url(),'image':p.image.url,'price':'99.90 KM'}])
+        self.assertEqual(response.json()['products'], [{'name':p.name,'url':p.get_absolute_url(),'image':p.image_url,'price':'99.90 KM'}])
         self.assertEqual(self.client.get('/pretraga/prijedlozi/', {'q':''}).json()['products'], [])
         self.assertEqual(self.client.get('/pretraga/prijedlozi/', {'q':'nepostoji'}).json()['products'], [])
         self.assertEqual(self.client.get('/pretraga/prijedlozi/', {'q':'Laptop','sale':'1'}).json()['products'], [])

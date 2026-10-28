@@ -272,7 +272,7 @@ def panel(request, section=None, orders_in_wms=False):
             'name': p.name,
             'detail': f'{p.price:.2f} KM',
             'original_price': f'{p.original_price:.2f} KM' if p.original_price and p.original_price > p.price else '',
-            'image_url': p.image.url if p.image else '',
+            'image_url': p.image_url if p.image else '',
         } for p in Product.objects.all()]
     elif section == 'kategorije':
         rows = [{'id': c.pk, 'name': c.name, 'image_url': c.image.url if c.image else ''} for c in Category.objects.all()]
@@ -281,7 +281,7 @@ def panel(request, section=None, orders_in_wms=False):
     elif section == 'banneri':
         rows = [{'id': b.pk, 'name': b.title, 'detail': b.get_position_display(), 'image_url': b.image.url if b.image else ''} for b in Banner.objects.all()]
     elif section == 'akcije':
-        rows = [{'id': p.pk, 'name': p.name, 'detail': f'{p.price:.2f} KM', 'image_url': p.image.url if p.image else ''} for p in Product.objects.filter(is_active=True).on_sale()]
+        rows = [{'id': p.pk, 'name': p.name, 'detail': f'{p.price:.2f} KM', 'image_url': p.image_url if p.image else ''} for p in Product.objects.filter(is_active=True).on_sale()]
     elif section == 'korisnici':
         from django.contrib.auth import get_user_model
         rows = list(get_user_model().objects.order_by('-date_joined', '-pk'))
@@ -441,6 +441,8 @@ def product_detail(request, pk):
             'new_total': sum((item['price'] for item in items), Decimal('0.00')),
         })
     gallery = ([product.image] if product.image else []) + [item.image for item in product.additional_images.all() if item.image]
+    from urllib.parse import urlencode
+    gallery = [{'name': photo.name, 'url': reverse('product_image_download', args=[product.pk]) + '?' + urlencode({'image': photo.name})} for photo in gallery]
     return render(request, 'shop/product_detail.html', {
         'product_gallery': gallery,
         'product': product,
@@ -471,7 +473,7 @@ def search_suggestions(request):
         products = products.bestsellers()
     return JsonResponse({'products': [
         {'name': p.name, 'url': p.get_absolute_url(),
-         'image': p.image.url if p.image else '', 'price': f'{p.price:.2f} KM'}
+         'image': p.image_url if p.image else '', 'price': f'{p.price:.2f} KM'}
         for p in products[:8]
     ]})
 

@@ -27,7 +27,7 @@ from shop.views import bonus_reward_add, loyalty_page, customer_csrf_token, stoc
 from shop.seo import robots, sitemap
 from shop.chatbot import chat
 
-from shop.media_views import product_share_image
+from shop.media_views import product_share_image, product_image_download
 
 from shop import gift_popup
 
@@ -35,6 +35,8 @@ urlpatterns = [
     path('poklon/config/', gift_popup.config_view, name='gift_popup_config'),
     path('poklon/odgovor/', gift_popup.answer_view, name='gift_popup_answer'),
     path('poklon/izbor/', gift_popup.select_view, name='gift_popup_select'),
+    path('artikal/<int:pk>/slika/', product_image_download, name='product_image_download'),
+    path('artikal/<int:pk>/slika.avif', product_image_download, name='product_image_download_legacy'),
     path('artikal/<int:pk>/share.jpg', product_share_image, name='product_share_image'),
     path('bonus-nagrada/<int:pk>/dodaj/', bonus_reward_add, name='bonus_reward_add'),
     path('artikal/<int:pk>/obavijest/', stock_notification_subscribe, name='stock_notification_subscribe'),

@@ -1,4 +1,6 @@
 from tempfile import TemporaryDirectory
+from urllib.parse import urlencode
+from django.urls import reverse
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -20,6 +22,9 @@ class ProductGalleryTests(TestCase):
         self.client.force_login(get_user_model().objects.create_user('gallery-manager', is_staff=True))
         self.product = Product.objects.create(name='Gallery', price=10, image=upload())
 
+    def image_url(self, photo):
+        return reverse('product_image_download', args=[self.product.pk]) + '?' + urlencode({'image': photo.image.name})
+
     def data(self):
         return {'name': 'Gallery', 'price': '10', 'stock': '1', 'is_active': 'on'}
 
@@ -29,20 +34,20 @@ class ProductGalleryTests(TestCase):
             response = self.client.post(f'/panel/artikli/{self.product.pk}/uredi/',
                                         {**self.data(), 'additional_images': [upload(), upload()]})
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(encode.call_count, 2)  # Form results are not re-encoded by model.
+        self.assertEqual(encode.call_count, 0)  # Form results are not re-encoded by model.
         self.product.refresh_from_db()
         self.assertEqual(self.product.image.name, original)
         photos = list(self.product.additional_images.all())
         self.assertEqual([p.position for p in photos], [0, 1])
         for photo in photos:
             self.assertTrue(photo.image.name.startswith('products/gallery/'))
-            self.assertLessEqual(photo.image.size, 30_000)
+            self.assertGreater(photo.image.size, 0)
         response = self.client.get(self.product.get_absolute_url())
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="product-thumbnails"')
         self.assertContains(response, 'data-product-image=', count=3)
         for photo in photos:
-            self.assertContains(response, photo.image.url)
+            self.assertContains(response, self.image_url(photo))
         self.assertContains(self.client.get(f'/panel/artikli/{self.product.pk}/uredi/'), 'Postojeće dodatne slike')
 
     def test_empty_edit_preserves_images_and_new_upload_appends(self):
@@ -81,7 +86,7 @@ class ProductGalleryTests(TestCase):
         photo = ProductImage.objects.create(product=self.product, image=upload())
         response = self.client.get(self.product.get_absolute_url())
         self.assertContains(response, 'data-product-main-image')
-        self.assertContains(response, photo.image.url)
+        self.assertContains(response, self.image_url(photo))
         self.assertContains(response, 'id="productZoomDialog"')
 
     def test_anonymous_cannot_upload(self):
@@ -104,8 +109,8 @@ class ProductGalleryTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.image.name, primary)
         page = self.client.get(self.product.get_absolute_url())
-        self.assertNotContains(page, first.image.url)
-        self.assertContains(page, second.image.url)
+        self.assertNotContains(page, self.image_url(first))
+        self.assertContains(page, self.image_url(second))
 
     def test_foreign_image_cannot_be_deleted(self):
         other = Product.objects.create(name='Other', price=10)
