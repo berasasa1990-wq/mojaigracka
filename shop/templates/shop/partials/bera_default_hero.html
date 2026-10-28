@@ -1,4 +1,5 @@
 {% load storefront_images %}
+<div data-hero-slideshow>
 {% for hero_banner in hero_banners %}
 {% if hero_banner.image %}
 <section class="bera-uploaded-hero" aria-label="{{ hero_banner.title }}">
@@ -22,3 +23,5 @@
 </section>
 {% endif %}
 {% endfor %}
+
+</div>

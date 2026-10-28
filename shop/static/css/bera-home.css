@@ -615,3 +615,6 @@
 .bera-footer__bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
 .bera-footer__credit{margin-left:auto}
 .bera-footer .bera-footer__credit a{display:inline;margin:0;font-size:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px}
+
+[data-hero-slideshow]>section[hidden]{display:none}
+.hero-slideshow-pause{display:block;margin:-12px var(--inset) 16px auto;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}

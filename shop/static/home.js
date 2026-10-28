@@ -548,3 +548,26 @@ document.querySelectorAll('[data-product-image]').forEach(button => {
     });
   });
 });
+
+
+// Rotate the main banners every three seconds when several are configured.
+document.querySelectorAll('[data-hero-slideshow]').forEach(slideshow => {
+  const slides = Array.from(slideshow.children).filter(slide => slide.matches('section'));
+  if (slides.length < 2) return;
+  let current = 0;
+  let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const show = () => slides.forEach((slide, index) => { slide.hidden = index !== current; });
+  show();
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'hero-slideshow-pause';
+  const label = () => { toggle.textContent = paused ? 'Pokreni bannere' : 'Pauziraj bannere'; };
+  label();
+  toggle.addEventListener('click', () => { paused = !paused; label(); });
+  slideshow.append(toggle);
+  setInterval(() => {
+    if (paused || document.hidden || slideshow.matches(':hover') || slideshow.contains(document.activeElement)) return;
+    current = (current + 1) % slides.length;
+    show();
+  }, 3000);
+});
