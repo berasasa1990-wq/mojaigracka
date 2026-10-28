@@ -606,7 +606,7 @@
 .product-card--home-reference .product-image{aspect-ratio:1.65}
 .product-card--home-reference .product-image>img{padding:4px 12px}
 .product-card--home-reference .card-copy{flex:1;padding-top:6px}
-.product-card--home-reference .card-copy h3{height:2.6em;min-height:2.6em;margin-bottom:6px}
+.product-card--home-reference .card-copy h3{display:block;height:1.3em;min-height:1.3em;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}
 .product-card--home-reference .stock{margin-bottom:8px}
 .product-card--home-reference .product-prices{margin-top:auto;min-height:26px}
 .product-card--home-reference .product-brand-row{min-height:24px;margin:3px 0 8px}
@@ -624,3 +624,40 @@
 .product-detail-video{display:block;width:100%;height:100%;max-height:550px;min-height:0;object-fit:contain}
 .product-detail-photo>[hidden]{display:none}
 .product-video-return{position:absolute;left:12px;bottom:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer}
+
+@media(min-width:901px){
+  [data-product-carousel]>.home-product-carousel__track{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:calc((100% - 60px)/6);overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:4px}
+  [data-product-carousel]>.home-product-carousel__track::-webkit-scrollbar{display:none}
+  [data-product-carousel] .product-card--home-reference{scroll-snap-align:start}
+}
+.product-carousel-controls{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.product-carousel-controls button{border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--blue);padding:7px 11px;font:inherit;font-size:12px;cursor:pointer}
+.product-carousel-controls button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media(max-width:900px){.product-carousel-controls{display:none}}
+
+.bera-footer details{margin-bottom:13px}
+.bera-footer summary{font-size:13px;cursor:pointer;line-height:1.5;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.bera-footer summary::-webkit-details-marker{display:none}
+.bera-footer summary::after{content:'+';color:#83d6ec}
+.bera-footer details[open]>summary::after{content:'−'}
+.bera-footer details[open]>summary{color:#fff;margin-bottom:10px}
+.bera-footer details p{font-size:12px;line-height:1.8;margin:0 0 12px}
+.bera-footer details p a{display:inline;font-size:inherit;text-decoration:underline}
+.bera-footer summary:focus-visible,.bera-footer a:focus-visible{outline:2px solid #83d6ec;outline-offset:4px}
+.bera-footer__grid>div{min-width:0;overflow-wrap:anywhere}
+
+/* Phone layout: compact categories, two benefits, wider offer banners. */
+@media(max-width:600px){
+  .mobile-home-category-grid{gap:8px}
+  .mobile-home-category-grid>a{flex:0 0 80px;gap:5px;padding:8px 4px;font-size:11px;border-radius:11px}
+  .mobile-home-category-grid>a>.mobile-home-category-icon,.mobile-home-category-grid>a>svg{width:48px;height:48px}
+  .mobile-home-benefits{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:calc((100% - 10px)/2);gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin-block:16px}
+  .mobile-home-benefits::-webkit-scrollbar{display:none}
+  .mobile-home-benefits__item{min-width:0;min-height:84px;padding:12px 9px;gap:8px;scroll-snap-align:start;border-radius:12px}
+  .mobile-home-benefits__item>div{min-width:0}
+  .mobile-home-benefits__item>svg{width:23px;height:23px;flex-basis:23px}
+  .mobile-home-benefits strong{font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+  .mobile-home-benefits span{font-size:10px;line-height:1.5;margin-top:4px}
+  .bera-offer-banners{grid-template-columns:1fr;gap:12px}
+  .bera-offer-banner.bera-offer-banner--uploaded{width:100%;aspect-ratio:8/3}
+}

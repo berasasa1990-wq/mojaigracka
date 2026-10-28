@@ -619,3 +619,50 @@ if (productVideo) {
   }, { once: true });
   startVideo();
 }
+
+
+// Six visible desktop products; advance one card every three seconds.
+document.querySelectorAll('[data-product-carousel]').forEach(section => {
+  const track = section.querySelector('.home-product-carousel__track');
+  if (!track || track.children.length <= 6) return;
+  const desktop = window.matchMedia('(min-width: 901px)');
+  let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const advance = direction => {
+    if (!desktop.matches) return;
+    const step = track.children[0].getBoundingClientRect().width + parseFloat(getComputedStyle(track).columnGap || '12');
+    const end = track.scrollWidth - track.clientWidth;
+    const next = direction > 0 && track.scrollLeft >= end - 2 ? 0 : direction < 0 && track.scrollLeft <= 2 ? end : track.scrollLeft + direction * step;
+    track.scrollTo({left: next, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  };
+  const controls = document.createElement('div');
+  controls.className = 'product-carousel-controls';
+  const button = (text, action) => {
+    const element = document.createElement('button');
+    element.type = 'button'; element.textContent = text;
+    element.addEventListener('click', action); controls.append(element);
+    return element;
+  };
+  button('← Prethodni', () => advance(-1));
+  const pause = button(paused ? 'Pokreni' : 'Pauziraj', () => {
+    paused = !paused; pause.textContent = paused ? 'Pokreni' : 'Pauziraj';
+  });
+  button('Sljedeći →', () => advance(1));
+  section.append(controls);
+  setInterval(() => {
+    if (!paused && !document.hidden && !section.matches(':hover') && !section.contains(document.activeElement)) advance(1);
+  }, 3000);
+});
+
+// On phones, show two purchase benefits and rotate to the next pair.
+document.querySelectorAll('.mobile-home-benefits').forEach(track => {
+  const phone = window.matchMedia('(max-width: 600px)');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let interactingUntil = 0;
+  track.addEventListener('touchstart', () => { interactingUntil = Date.now() + 6000; }, {passive: true});
+  setInterval(() => {
+    if (!phone.matches || reduced.matches || document.hidden || Date.now() < interactingUntil || track.contains(document.activeElement)) return;
+    const end = track.scrollWidth - track.clientWidth;
+    if (end <= 2) return;
+    track.scrollTo({left: track.scrollLeft >= end - 2 ? 0 : Math.min(end, track.scrollLeft + track.clientWidth + 10), behavior: 'smooth'});
+  }, 3000);
+});

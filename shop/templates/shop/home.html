@@ -11,11 +11,11 @@
 <div id="proizvodi">
 {% if selected_brand or search_query or category_filter or sale_only or new_only or bestselling_only %}<section class="home-products"><h1>{% if search_query %}Rezultati za „{{ search_query }}”{% elif bestselling_only %}Najprodavaniji proizvodi{% elif new_only %}Noviteti{% elif sale_only %}Akcijska ponuda{% elif selected_brand %}{{ selected_brand.name }}{% else %}{{ selected_category.name }}{% endif %}</h1>{% if selected_category %}{% include 'shop/partials/products.html' with hide_purchase=False %}{% else %}{% include 'shop/partials/products.html' with hide_purchase=True %}{% endif %}{% if not products %}<p>{% if search_query %}Nema proizvoda za ovu pretragu.{% elif bestselling_only %}Trenutno nema naručenih artikala.{% elif new_only %}Trenutno nema noviteta.{% elif sale_only %}Trenutno nema sniženih artikala.{% elif selected_brand %}Trenutno nema artikala ovog brenda.{% else %}Trenutno nema artikala u ovoj kategoriji.{% endif %}</p>{% endif %}</section>
 {% else %}
-{% if featured_products %}<section class="home-products" id="izdvojeno"><div class="section-heading"><h2>Izdvojena ponuda</h2><a href="{% url 'bestsellers' %}">Pogledaj sve →</a></div>{% include 'shop/partials/products.html' with products=featured_products %}</section>{% endif %}
+{% if featured_products %}<section class="home-products" id="izdvojeno" data-product-carousel><div class="section-heading"><h2>Izdvojena ponuda</h2><a href="{% url 'bestsellers' %}">Pogledaj sve →</a></div>{% include 'shop/partials/products.html' with products=featured_products %}</section>{% endif %}
 <div id="ponude">{% include 'shop/partials/bera_offer_banners.html' %}</div>
 {% include 'shop/partials/bera_middle_banner.html' %}
-<section class="home-products" id="novo"><div class="section-heading"><h2>Novo u ponudi</h2></div>{% include 'shop/partials/products.html' with products=new_products %}{% if not new_products %}<p>Trenutno nema unesenih artikala.</p>{% endif %}</section>
-{% if sale_products %}<section class="home-products" id="akcijska-ponuda"><div class="section-heading"><h2>Akcijska ponuda</h2></div>{% include 'shop/partials/products.html' with products=sale_products %}</section>{% endif %}
+<section class="home-products" id="novo" data-product-carousel><div class="section-heading"><h2>Novo u ponudi</h2></div>{% include 'shop/partials/products.html' with products=new_products %}{% if not new_products %}<p>Trenutno nema unesenih artikala.</p>{% endif %}</section>
+{% if sale_products %}<section class="home-products" id="akcijska-ponuda" data-product-carousel><div class="section-heading"><h2>Akcijska ponuda</h2></div>{% include 'shop/partials/products.html' with products=sale_products %}</section>{% endif %}
 {% include 'shop/partials/bera_home_bottom.html' %}
 {% endif %}</div></main>
 {% include 'shop/partials/bera_footer.html' %}

@@ -426,7 +426,7 @@ def home(request, category_pk=None, sale_only=False, new_only=False, bestselling
         'showcase_brands': Brand.objects.filter(product__is_active=True).distinct(),
         'featured_products': products.filter(is_featured=True),
         'bestselling_products': products.bestsellers()[:6],
-        'new_products': products[:6],
+        'new_products': products[:24],
         'sale_products': products.on_sale(),
         'products': products,
         'bestselling_only': bestselling_only,

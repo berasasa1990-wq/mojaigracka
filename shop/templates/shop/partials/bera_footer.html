@@ -1,12 +1,28 @@
 {% load storefront_images %}
-{% load static %}
 <footer class="bera-footer">
-    <div class="bera-footer__grid">
-        <div class="bera-footer__brand" id="footerContact"><a href="{% url 'home' %}" aria-label="{{ shop_name }}">{% if site_settings.logo %}<img {% artwork_sources site_settings 'logo' %} alt="{{ shop_name }}" width="150" height="60" loading="lazy">{% endif %}</a><p>Kvalitet, sigurnost i podrška.<br>Vaša online trgovina.</p>{% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}<div class="bera-footer__social">{% if facebook_url %}<a href="{{ facebook_url }}" aria-label="Facebook" target="_blank" rel="noopener">f</a>{% endif %}{% if instagram_url %}<a href="{{ instagram_url }}" aria-label="Instagram" target="_blank" rel="noopener">◎</a>{% endif %}</div></div>
-        <div><h3>Korisnički servis</h3><a href="{% url 'home' %}#kontakt">Kontakt</a><a href="{% url 'home' %}">Dostava</a><a href="{% url 'home' %}">Povrat i reklamacije</a>{% if contact_phone %}<a href="tel:{{ contact_phone }}">{{ contact_phone }}</a>{% endif %}</div>
-        <div><h3>Informacije</h3><a href="{% url 'home' %}">O nama</a><a href="{% url 'home' %}">Uslovi kupovine</a><a href="{% url 'home' %}">Politika privatnosti</a><a href="{% url 'home' %}">Blog</a></div>
-        <div><h3>Moj nalog</h3>{% if loyalty_enabled %}<a href="{% url 'loyalty' %}">Loyalty program</a>{% endif %}<a href="{% url 'home' %}">Prijava</a><a href="{% url 'home' %}">Registracija</a><a href="{% url 'home' %}">Lista želja</a><a href="{% url 'home' %}">Moje narudžbe</a></div>
-        <div class="bera-footer__payments"><h3>Načini plaćanja</h3><a href="{% url 'home' %}" class="bera-footer__payment-row"><span>VISA</span><img src="{% static 'img/mastercard.png' %}" alt="Mastercard" width="65" height="38" loading="lazy"><span class="bera-footer__cash">▣ Pouzećem</span></a><a href="{% url 'home' %}">Sigurnost plaćanja</a></div>
+  <div class="bera-footer__grid">
+    <div class="bera-footer__brand" id="footerContact">
+      <a href="{% url 'home' %}" aria-label="Mojaigracka.com">{% if site_settings.logo %}<img {% artwork_sources site_settings 'logo' %} alt="Mojaigracka.com" width="150" height="60" loading="lazy">{% endif %}</a>
+      <p>Kvalitetne i unikatne igračke za djecu.<br>Vaš online shop u Bosni i Hercegovini.</p>
+      <a href="https://www.facebook.com/mojaigracka" target="_blank" rel="noopener noreferrer">Kontakt putem Facebooka →</a>
     </div>
-    <div class="bera-footer__bottom"><span>© {% now 'Y' %} Sva prava zadržava Mojaigracka.com</span><span class="bera-footer__credit">Izrada sajta: <a href="https://www.bera-it.com/">BERA-IT</a></span></div>
+    <div><h3>Korisnički servis</h3>
+      <a href="https://www.facebook.com/mojaigracka" target="_blank" rel="noopener noreferrer">Kontakt</a>
+      <details><summary>Dostava</summary><p>Pošiljke šaljemo brzom poštom X Express. Očekivani rok dostave je 24 sata od predaje pošiljke kurirskoj službi. Dostava iznosi 11 KM i plaća se pri prijemu kuriru, zajedno s iznosom narudžbe.</p><p>Sve pošiljke su osigurane i zapakovane u čvrste kartonske kutije. U slučaju loma zamjenjujemo oštećene artikle.</p></details>
+      <details><summary>Povrat i reklamacije</summary><p>U slučaju loma ili greške pri slanju zamjenjujemo artikle. Sačuvajte papirnu dokumentaciju o narudžbi koja dolazi uz artikal i priložite je uz reklamaciju.</p><p>Za dogovor o zamjeni javite nam se putem <a href="https://www.facebook.com/mojaigracka" target="_blank" rel="noopener noreferrer">Facebook stranice Moja Igračka</a> uz broj narudžbe, opis problema i fotografije artikla i pakovanja.</p></details>
+    </div>
+    <div><h3>Informacije</h3>
+      <details><summary>O nama</summary><p>Mojaigracka.com je online shop na području Bosne i Hercegovine. Nudimo kvalitetne i unikatne igračke za djecu, za igru, istraživanje i posebne poklone.</p></details>
+      <details><summary>Uslovi kupovine</summary><p>Kupovinu obavljate putem našeg online shopa: dodajte artikle u korpu, provjerite narudžbu i unesite podatke za dostavu. Plaćanje je pri prijemu robe, kuriru. Prije potvrde narudžbe prikazani su cijena artikala, dostava i ukupan iznos za plaćanje.</p></details>
+      <details><summary>Privatnost</summary><p>Podaci koje unesete pri kupovini ili otvaranju naloga ne prikazuju se javno na sajtu. Koristimo ih za obradu narudžbi, vođenje vašeg naloga i komunikaciju o kupovini. Kurirskoj službi dostavljamo podatke potrebne za isporuku.</p><p>Stranica koristi HTTPS vezu za zaštitu podataka u prijenosu. Lozinku čuvajte za sebe i odjavite se nakon korištenja zajedničkog uređaja.</p></details>
+    </div>
+    <div><h3>Moj nalog</h3>
+      {% if loyalty_enabled %}<details><summary>Loyalty program</summary><p>Kupovinom s prijavljenim nalogom skupljate loyalty bodove. Bodovi se automatski dodaju na nalog nakon obrade narudžbe, prema pravilima programa. U korpi ih možete iskoristiti klikom na „Iskoristi bodove“. Bodovi se ne koriste bez vašeg izbora.</p><a href="{% url 'loyalty' %}">Pregled loyalty programa →</a></details>{% endif %}
+      <details><summary>Prijava i registracija</summary><p>Registrujte nalog svojim podacima i lozinkom. Ako već imate nalog, prijavite se da pratite narudžbe i koristite dostupne loyalty pogodnosti.</p><a href="{% url 'customer_login' %}">Prijava →</a><a href="{% url 'customer_register' %}">Registracija →</a></details>
+      <details><summary>Lista želja</summary><p>Sačuvajte omiljene artikle klikom na srce i pregledajte ih kasnije na listi želja.</p><a href="{% url 'wishlist' %}">Otvori listu želja →</a></details>
+      <details><summary>Moje narudžbe</summary><p>Na svom nalogu možete pregledati narudžbe napravljene dok ste prijavljeni: kupljene artikle, datum kupovine i status narudžbe.</p><a href="{% url 'account' %}">Pregled narudžbi →</a></details>
+    </div>
+    <div class="bera-footer__payments"><h3>Način plaćanja</h3><p>Plaćanje pouzećem</p><p>Narudžbu plaćate kuriru pri prijemu robe.</p><p><strong>Dostava: 11 KM</strong><br>Brza pošta X Express<br>Očekivana isporuka za 24 sata od slanja.</p></div>
+  </div>
+  <div class="bera-footer__bottom"><span>© {% now 'Y' %} Sva prava zadržava Mojaigracka.com</span><span class="bera-footer__credit">Izrada sajta: <a href="https://www.bera-it.com/">BERA-IT</a></span></div>
 </footer>
