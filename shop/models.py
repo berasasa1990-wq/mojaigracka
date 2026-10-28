@@ -1,6 +1,7 @@
 from decimal import Decimal
 import uuid
 from .image_uploads import AVIFFileField
+from .product_video import validate_product_video
 from .storage import public_image_storage
 from .product_images import ProductImageVariantsMixin
 from django.conf import settings
@@ -105,6 +106,8 @@ class Product(ProductImageVariantsMixin, models.Model):
     objects = ProductQuerySet.as_manager()
 
     name = models.CharField('Naziv', max_length=255)
+    sku = models.CharField('Šifra artikla', max_length=100, blank=True)
+    video = models.FileField('Video artikla', storage=public_image_storage, upload_to='products/videos/', blank=True, validators=[validate_product_video], help_text='MP4 ili MOV video do 5 sekundi, najviše 20 MB. Automatski se pušta bez zvuka na stranici artikla.')
     description = models.TextField('Opis', blank=True)
     image = AVIFFileField('Slika', storage=public_image_storage, upload_to='products/', blank=True)
     image_variants = models.JSONField(default=dict, blank=True, editable=False)
@@ -142,6 +145,10 @@ class Product(ProductImageVariantsMixin, models.Model):
     def get_absolute_url(self):
         from django.urls import reverse
         return reverse('product_detail', kwargs={'pk': self.pk})
+
+    @property
+    def video_content_type(self):
+        return 'video/quicktime' if self.video.name.lower().endswith('.mov') else 'video/mp4'
 
     @property
     def image_sources(self):

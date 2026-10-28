@@ -535,6 +535,15 @@ productShareButton?.addEventListener('click', async () => {
 document.querySelectorAll('[data-product-image]').forEach(button => {
   button.addEventListener('click', () => {
     const main = document.querySelector('[data-product-main-image]');
+    const video = document.querySelector('[data-product-video]');
+    if (video) {
+      video.pause(); video.hidden = true;
+      if (main) main.hidden = false;
+      document.querySelector('[data-product-video-return]').hidden = false;
+      const zoom = document.querySelector('[data-product-zoom]');
+      if (zoom) zoom.hidden = false;
+    }
+
     const zoom = document.querySelector('[data-product-zoom-image]');
     if (!main) return;
     if (button.dataset.productSrcset) main.setAttribute('srcset', button.dataset.productSrcset);
@@ -570,4 +579,15 @@ document.querySelectorAll('[data-hero-slideshow]').forEach(slideshow => {
     current = (current + 1) % slides.length;
     show();
   }, 3000);
+});
+
+document.querySelector('[data-product-video-return]')?.addEventListener('click', event => {
+  const video = document.querySelector('[data-product-video]');
+  const image = document.querySelector('[data-product-main-image]');
+  if (image) image.hidden = true;
+  const zoom = document.querySelector('[data-product-zoom]');
+  if (zoom) zoom.hidden = true;
+  video.hidden = false;
+  video.play().catch(() => {});
+  event.currentTarget.hidden = true;
 });

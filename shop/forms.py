@@ -42,6 +42,7 @@ class MultipleProductImagesField(forms.FileField):
 
 
 class ProductForm(forms.ModelForm):
+    video = forms.FileField(label='Video artikla', required=False, widget=forms.ClearableFileInput(attrs={'accept': '.mp4,.mov,video/mp4,video/quicktime'}), help_text='MP4 ili MOV video do 5 sekundi, najviše 20 MB. Za najširu podršku preglednika koristite MP4 (H.264).')
     remove_images = forms.ModelMultipleChoiceField(queryset=ProductImage.objects.none(),
         required=False, widget=forms.MultipleHiddenInput)
 
@@ -86,7 +87,7 @@ class ProductForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ['name', 'image', 'description', 'price', 'original_price', 'brand', 'category', 'stock', 'is_out_of_stock', 'is_active', 'is_featured', 'seo_title', 'seo_description']
+        fields = ['name', 'sku', 'image', 'video', 'description', 'price', 'original_price', 'brand', 'category', 'stock', 'is_out_of_stock', 'is_active', 'is_featured', 'seo_title', 'seo_description']
 
     def clean_price(self):
         value = self.cleaned_data['price']
