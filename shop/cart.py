@@ -13,6 +13,10 @@ def cart_context(request):
     for item in items:
         item['plus_offer'] = article_plus_offer(item['product'], quantities)
         item['quantity_offers'] = quantity_offers(item['product'], item['quantity'])
+    if not items:
+        # A new basket must not inherit a previous loyalty selection.
+        request.session.pop('loyalty_customer', None)
+        request.session.pop('cart_loyalty_points', None)
     store = StoreSettings.objects.filter(pk=1).first()
     subtotal = sum((i['subtotal'] for i in items), Decimal('0.00'))
     from .loyalty import loyalty_status, loyalty_amount, applied_loyalty_percent, rules

@@ -71,6 +71,25 @@ class CheckoutPointsPreviewTests(TestCase):
         self.client.post(reverse('cart'), {'use_max_points': '1'})
         response = self.client.get(reverse('cart'))
         self.assertEqual(response.context['points_used'], 1000)
-        self.assertContains(response, 'Primijeni bodove')
+        self.assertContains(response, 'Iskoristi bodove')
+        self.assertNotContains(response, 'name="loyalty_points"')
         self.client.post(reverse('cart'), {'loyalty_points': 0})
         self.assertEqual(self.client.get(self.url).context['points_used'], 0)
+
+    def test_no_click_means_no_points_used(self):
+        self.assertEqual(self.client.get(reverse('cart')).context['points_used'], 0)
+        self.assertEqual(self.client.get(self.url).context['points_used'], 0)
+        self.client.post(self.url, dict(customer_name='Kupac', email='buyer@example.com', phone='061123456', address='Ulica 1', city='Sarajevo', postal_code='71000', loyalty_points=1000))
+        self.assertEqual(Order.objects.get().loyalty_discount, Decimal('0'))
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.points, 1000)
+
+    def test_empty_cart_clears_previous_loyalty_choices(self):
+        session = self.client.session
+        session['loyalty_customer'] = self.user.pk
+        session['cart_loyalty_points'] = {'customer': self.user.pk, 'points': 1000}
+        session['cart'] = {}
+        session.save()
+        self.client.get(reverse('cart'))
+        self.assertNotIn('loyalty_customer', self.client.session)
+        self.assertNotIn('cart_loyalty_points', self.client.session)

@@ -42,7 +42,7 @@ class MultipleProductImagesField(forms.FileField):
 
 
 class ProductForm(forms.ModelForm):
-    video = forms.FileField(label='Video artikla', required=False, widget=forms.ClearableFileInput(attrs={'accept': '.mp4,.mov,video/mp4,video/quicktime'}), help_text='MP4 ili MOV video do 5 sekundi, najviše 20 MB. Za najširu podršku preglednika koristite MP4 (H.264).')
+    video = forms.FileField(label='Video artikla', required=False, widget=forms.ClearableFileInput(attrs={'accept': '.mp4,.mov,video/mp4,video/quicktime'}), help_text='MP4 ili MOV video do 5 sekundi, najviše 20 MB. Automatski se pretvara u MP4 (H.264) za preglednike.')
     remove_images = forms.ModelMultipleChoiceField(queryset=ProductImage.objects.none(),
         required=False, widget=forms.MultipleHiddenInput)
 
@@ -54,6 +54,13 @@ class ProductForm(forms.ModelForm):
             self.fields.pop('is_out_of_stock', None)
         if self.instance.pk:
             self.fields['remove_images'].queryset = self.instance.additional_images.all()
+
+    def clean_video(self):
+        video = self.cleaned_data.get('video')
+        if video and self.files.get('video'):
+            from .product_video import browser_video
+            return browser_video(video)
+        return video
 
     additional_images = MultipleProductImagesField(label='Dodatne slike', required=False,
         help_text='Odaberite više slika, najviše 6 odjednom. Automatski se generišu veličine 300, 500 i 800 px. KB ciljevi su okvirni, bez agresivnog gubitka kvaliteta. Prikazuju se lijevo od glavne slike.')

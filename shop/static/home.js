@@ -591,3 +591,31 @@ document.querySelector('[data-product-video-return]')?.addEventListener('click',
   video.play().catch(() => {});
   event.currentTarget.hidden = true;
 });
+
+
+// Let the browser inspect the actual video codec instead of rejecting MOV's MIME hint.
+const productVideo = document.querySelector('[data-product-video]');
+if (productVideo) {
+  productVideo.muted = true;
+  productVideo.defaultMuted = true;
+  const startVideo = () => {
+    if (!productVideo.hidden) productVideo.play().catch(() => {});
+  };
+  productVideo.addEventListener('loadeddata', startVideo);
+  productVideo.addEventListener('canplay', startVideo);
+  productVideo.addEventListener('error', () => {
+    const image = document.querySelector('[data-product-main-image]');
+    if (image) {
+      productVideo.hidden = true;
+      image.hidden = false;
+      const zoom = document.querySelector('[data-product-zoom]');
+      if (zoom) zoom.hidden = false;
+    }
+    const message = document.createElement('p');
+    message.className = 'product-video-error';
+    message.textContent = 'Preglednik ne može pustiti ovaj video. Za podršku na svim uređajima učitajte MP4 (H.264).';
+    message.setAttribute('role', 'status');
+    productVideo.parentElement.append(message);
+  }, { once: true });
+  startVideo();
+}

@@ -7,3 +7,5 @@ pillow==12.3.0
 cryptography==48.0.1
 django-storages==1.14.6
 boto3==1.43.119
+
+imageio-ffmpeg==0.6.0

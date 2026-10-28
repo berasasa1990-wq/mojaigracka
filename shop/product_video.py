@@ -46,3 +46,38 @@ def validate_product_video(file):
         raise ValidationError('Odaberite ispravan MP4 ili MOV video trajanja do 5 sekundi.') from None
     finally:
         file.seek(0)
+
+
+def browser_video(upload):
+    """Normalize an uploaded clip to silent H.264 MP4 with fast-start metadata."""
+    import subprocess
+    import tempfile
+    import uuid
+    from pathlib import Path
+    from django.core.files.base import ContentFile
+    import imageio_ffmpeg
+
+    validate_product_video(upload)
+    try:
+        with tempfile.TemporaryDirectory(prefix='product-video-') as directory:
+            source = Path(directory) / 'input.mov'
+            target = Path(directory) / 'output.mp4'
+            with source.open('wb') as output:
+                for chunk in upload.chunks():
+                    output.write(chunk)
+            subprocess.run([
+                imageio_ffmpeg.get_ffmpeg_exe(), '-nostdin', '-v', 'error',
+                '-i', str(source), '-map', '0:v:0', '-t', '5', '-an',
+                '-vf', "scale=w='min(1280,iw)':h='min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '24',
+                '-pix_fmt', 'yuv420p', '-threads', '1', '-movflags', '+faststart',
+                str(target),
+            ], check=True, capture_output=True, timeout=60)
+            data = target.read_bytes()
+            if not data or len(data) > 20_000_000:
+                raise ValueError
+            return ContentFile(data, name=f'{uuid.uuid4().hex}.mp4')
+    except (subprocess.SubprocessError, OSError, ValueError, RuntimeError):
+        raise ValidationError('Video nije moguće pretvoriti. Pokušajte s drugim MOV ili MP4 fajlom.') from None
+    finally:
+        upload.seek(0)
