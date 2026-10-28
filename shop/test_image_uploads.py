@@ -100,3 +100,30 @@ class ImageUploadTests(TestCase):
         form = BannerForm({'position': 'hero', 'title': 'Original'}, {'image': original})
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data['image'].read(), data)
+
+
+    def test_product_uploads_receive_branded_filename_and_preserve_bytes(self):
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            product = Product.objects.create(name='Hot Wheel', price=10)
+            for format, extension in [('PNG', '.png'), ('JPEG', '.jpg'), ('AVIF', '.avif')]:
+                original = upload(Image.new('RGB', (100, 50), 'blue'), format)
+                data = original.read()
+                original.seek(0)
+                product.image = original
+                product.save()
+                self.assertEqual(product.image.name, 'products/mojaigracka.com - Hot Wheel' + extension)
+                with product.image.open('rb') as stored:
+                    self.assertEqual(stored.read(), data)
+            extra = ProductImage.objects.create(product=product, image=upload())
+            self.assertEqual(extra.image.name, 'products/gallery/mojaigracka.com - Hot Wheel.png')
+            duplicate = ProductImage.objects.create(product=product, image=upload())
+            self.assertNotEqual(duplicate.image.name, extra.image.name)
+            self.assertTrue(duplicate.image.name.startswith('products/gallery/mojaigracka.com - Hot Wheel'))
+
+    def test_product_filename_is_safe_and_fits_field_length(self):
+        with TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            product = Product.objects.create(name='../Dječja / igračka\n' + 'A' * 200, price=10, image=upload())
+            self.assertLessEqual(len(product.image.name), 100)
+            self.assertTrue(product.image.name.startswith('products/mojaigracka.com - '))
+            self.assertNotIn('..', product.image.name)
+            self.assertNotIn('\n', product.image.name)

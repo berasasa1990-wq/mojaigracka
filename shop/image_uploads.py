@@ -109,6 +109,33 @@ class AVIFFileField(models.FileField):
         return {'max_bytes': 1_000_000, 'max_side': 1024 if self.name == 'logo' else 1920,
                 'prefer_webp': self.name == 'logo', 'quality': 85, 'preserve_quality': True}
 
+    def generate_filename(self, instance, filename):
+        label = instance._meta.label_lower
+        if label not in ('shop.product', 'shop.productimage'):
+            return super().generate_filename(instance, filename)
+        import datetime
+        import posixpath
+        import re
+        from pathlib import Path
+        from django.core.files.utils import validate_file_name
+
+        product = instance if label == 'shop.product' else instance.product
+        name = re.sub(r'[\x00-\x1f\x7f/\\:*?"<>|]', ' ', product.name)
+        name = ' '.join(name.split()).strip(' .') or 'artikal'
+        extension = Path(filename).suffix
+        directory = datetime.datetime.now().strftime(str(self.upload_to))
+        # Reserve space for storage's collision suffix within the existing field limit.
+        available = self.max_length - len(directory) - len('mojaigracka.com - ') - len(extension) - 10
+        basename = f'mojaigracka.com - {name[:max(1, available)].rstrip()}{extension}'
+        # Keep spaces in the requested public filename; validate before storage.save().
+        candidate = validate_file_name(posixpath.join(directory, basename), allow_relative_path=True)
+        if self.storage.exists(candidate):
+            from uuid import uuid4
+            # Keep .com in the brand prefix when Django detects a name collision.
+            stem = basename[:-len(extension)] if extension else basename
+            candidate = posixpath.join(directory, f'{stem} - {uuid4().hex[:8]}{extension}')
+        return candidate
+
     def pre_save(self, model_instance, add):
         file = getattr(model_instance, self.attname)
         if file and not file._committed:
