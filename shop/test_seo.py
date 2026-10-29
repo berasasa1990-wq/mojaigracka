@@ -104,3 +104,20 @@ class SEOTests(TestCase):
             cfg = form.save()
             self.assertContains(self.client.get('/'), 'property="og:image"')
             self.assertTrue(cfg.social_image.name.startswith('seo/'))
+
+
+class HeaderSiteNameTests(TestCase):
+    def test_logo_uses_configured_site_name_not_legacy_context(self):
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+        from django.contrib.auth.models import AnonymousUser
+        from types import SimpleNamespace
+        SEOSettings.objects.create(pk=1, site_name='Mojaigracka.com')
+        request = RequestFactory().get('/')
+        request.user = AnonymousUser()
+        html = render_to_string('shop/partials/header.html', {
+            'request': request, 'shop_name': 'BERA',
+            'site_settings': SimpleNamespace(logo=SimpleNamespace(name='store/logo.webp'), pk=1),
+        })
+        self.assertIn('alt="Mojaigracka.com"', html)
+        self.assertNotIn('alt="BERA"', html)

@@ -25,3 +25,10 @@ class EmailLoginTests(TestCase):
         user.is_staff = False
         user.save()
         self.assertFalse(PanelLoginForm(data={'username': user.email, 'password': 'test-pass'}).is_valid())
+
+    def test_customer_can_use_username_when_email_is_ambiguous(self):
+        user = get_user_model().objects.create_user('unique-buyer', email='same@example.com', password='same-pass')
+        get_user_model().objects.create_user('other-buyer', email='same@example.com', password='same-pass')
+        form = CustomerLoginForm(data={'username': 'unique-buyer', 'password': 'same-pass'})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.get_user(), user)

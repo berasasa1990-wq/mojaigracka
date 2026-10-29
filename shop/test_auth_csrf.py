@@ -56,3 +56,18 @@ class AuthCsrfTests(TestCase):
             self.assertEqual(self.client.post(url, payload, HTTP_ORIGIN='https://foreign.example').status_code, 403)
             self.assertEqual(self.client.post(url, payload).status_code, 302)
             redeem.assert_called_once()
+
+    def test_ajax_csrf_rejection_is_identified_but_still_forbidden(self):
+        response = self.client.post(reverse('customer_login'), {'username': self.user.email, 'password': 'River!Stone-2934'}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response['X-Auth-CSRF-Failure'], '1')
+        self.assertIn('no-store', response['Cache-Control'])
+        self.assertNotIn('_auth_user_id', self.client.session)
+        token = self.client.get(reverse('customer_csrf_token')).json()['csrfToken']
+        response = self.client.post(reverse('customer_login'), {'username': self.user.email, 'password': 'River!Stone-2934', 'csrfmiddlewaretoken': token}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(response.status_code, 302)
+
+    def test_panel_uses_same_refresh_script(self):
+        response = self.client.get(reverse('panel_login'))
+        self.assertContains(response, 'data-auth-csrf-url=')
+        self.assertContains(response, 'account-auth.js')

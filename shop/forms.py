@@ -465,7 +465,7 @@ class CustomerProfileForm(CustomerContactFormMixin, forms.ModelForm):
 
 
 class CustomerLoginForm(AuthenticationForm):
-    username = forms.EmailField(label='E-mail', widget=forms.EmailInput(attrs={'autocomplete': 'username', 'autofocus': True}))
+    username = forms.CharField(label='E-mail ili korisničko ime', widget=forms.TextInput(attrs={'autocomplete': 'username', 'autofocus': True}))
     password = forms.CharField(label='Lozinka', strip=False, widget=forms.PasswordInput(attrs={'autocomplete': 'current-password'}))
     error_messages = {'invalid_login': 'E-mail ili lozinka nisu ispravni.', 'inactive': 'Ovaj nalog nije aktivan.'}
 
@@ -474,7 +474,7 @@ class CustomerLoginForm(AuthenticationForm):
         email = self.cleaned_data.get('username')
         password = self.cleaned_data.get('password')
         if email and password:
-            self.user_cache = authenticate_by_email(self.request, email, password)
+            self.user_cache = authenticate_by_email(self.request, email, password) if '@' in email else authenticate(self.request, username=email.strip(), password=password)
             if self.user_cache is None:
                 raise self.get_invalid_login_error()
             self.confirm_login_allowed(self.user_cache)

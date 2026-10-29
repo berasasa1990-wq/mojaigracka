@@ -606,7 +606,7 @@
 .product-card--home-reference .product-image{aspect-ratio:1.65}
 .product-card--home-reference .product-image>img{padding:4px 12px}
 .product-card--home-reference .card-copy{flex:1;padding-top:6px}
-.product-card--home-reference .card-copy h3{display:block;height:1.3em;min-height:1.3em;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:1}
+.product-card--home-reference .card-copy h3{display:-webkit-box;height:2.6em;min-height:2.6em;margin-bottom:6px;white-space:normal;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .product-card--home-reference .stock{margin-bottom:8px}
 .product-card--home-reference .product-prices{margin-top:auto;min-height:26px}
 .product-card--home-reference .product-brand-row{min-height:24px;margin:3px 0 8px}
@@ -793,12 +793,8 @@ dialog.gift-builder{width:1040px;max-width:calc(100vw - 32px);max-height:92dvh;p
 }
 @media(max-width:340px){.gift-products{grid-template-columns:minmax(0,1fr)}}
 
-/* Product thumbnails immediately below the main photo, stacked vertically. */
-.product-image-layout.has-thumbnails{display:flex;flex-direction:column;gap:10px;align-items:stretch}
-.product-image-layout.has-thumbnails>.product-detail-gallery{order:0;width:100%}
-.product-image-layout.has-thumbnails>.product-thumbnails{order:1;position:static;inset:auto;width:100%;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:8px;overflow:visible;padding:2px}
-.product-image-layout.has-thumbnails .product-thumbnail{width:66px;height:66px}
-@media(min-width:901px){.product-detail-page:has(.product-image-layout.has-thumbnails)>.product-bundle{margin-left:0;width:100%}}
+/* Product thumbnails stay left of the main photo, stacked from the top. */
+.product-image-layout.has-thumbnails>.product-thumbnails{justify-content:flex-start;gap:8px}
 
 .gift-wrap-dialog{width:460px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:30px 24px;border:1px solid #cfe8f2;border-radius:18px;text-align:center;color:var(--ink)}
 .gift-wrap-dialog::backdrop{background:#09243f99;backdrop-filter:blur(3px)}

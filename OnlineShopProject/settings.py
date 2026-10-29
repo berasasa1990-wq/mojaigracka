@@ -290,3 +290,5 @@ META_SEND_HASHED_PII = os.environ.get('META_SEND_HASHED_PII', 'false').lower() =
 META_DEFAULT_COUNTRY_CALLING_CODE = os.environ.get('META_DEFAULT_COUNTRY_CALLING_CODE', '387')
 # Trust only a verified number of reverse proxy hops, never arbitrary forwarded headers.
 META_TRUSTED_PROXY_HOPS = int(os.environ.get('META_TRUSTED_PROXY_HOPS', '0'))
+
+CSRF_FAILURE_VIEW = 'shop.auth_csrf.csrf_failure'

@@ -27,7 +27,7 @@
     </section>
     {% else %}<section class="account-card customer-panel"><div class="customer-panel-heading"><div><h2>{% if account_section == 'security' %}Sigurnost naloga{% else %}Lični podaci{% endif %}</h2><p>{% if account_section == 'security' %}Promijenite lozinku uz potvrdu trenutne lozinke.{% else %}Ažurirajte ime, prezime i e-mail adresu.{% endif %}</p></div></div>
       <p class="account-username">Korisničko ime: {{ request.user.email }}</p>
-      <form method="post" class="account-form">{% csrf_token %}{% if account_section == 'security' %}<input type="hidden" name="action" value="password">{% endif %}{{ form.non_field_errors }}{% for field in form %}<div class="account-field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<div class="account-help" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>{% endif %}{{ field.errors }}</div>{% endfor %}<button class="purchase" type="submit">{% if account_section == 'security' %}Promijeni lozinku{% else %}Spremi podatke{% endif %}</button></form>
+      <form method="post" class="account-form" data-auth-csrf-url="{% url 'customer_csrf_token' %}">{% csrf_token %}{% if account_section == 'security' %}<input type="hidden" name="action" value="password">{% endif %}{{ form.non_field_errors }}{% for field in form %}<div class="account-field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<div class="account-help" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>{% endif %}{{ field.errors }}</div>{% endfor %}<button class="purchase" type="submit">{% if account_section == 'security' %}Promijeni lozinku{% else %}Spremi podatke{% endif %}</button></form>
     </section>{% endif %}
   </div>
 </div>

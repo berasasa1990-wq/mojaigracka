@@ -7,7 +7,7 @@
   <main class="panel-login">
     <section class="panel-content">
       <p class="eyebrow">VAŠA TRGOVINA</p><h1>Prijava u panel</h1>
-      <form method="post">
+      <form data-auth-csrf-url="{% url 'customer_csrf_token' %}" method="post">
         {% csrf_token %}
         {{ form.non_field_errors }}
         {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
@@ -16,5 +16,5 @@
       </form>
     </section>
   </main>
-</body>
+<script src="{% static 'account-auth.js' %}?v=2" defer></script></body>
 </html>
