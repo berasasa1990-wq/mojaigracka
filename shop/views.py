@@ -696,6 +696,14 @@ def checkout(request):
                 request.session.pop('gift_packaging', None)
                 request.session.pop('loyalty_customer', None)
                 request.session.pop('cart_loyalty_points', None)
+                from .meta_pixel import purchase_event
+                from django.db import DatabaseError
+                try:
+                    with transaction.atomic():
+                        purchase_event(request, order, payment_method='cod')
+                except DatabaseError:
+                    import logging
+                    logging.getLogger(__name__).warning('Meta purchase tracking unavailable')
                 request.session['last_order'] = order.pk
                 return redirect(reverse('checkout') + '?success=1')
     from .seo import settings_for

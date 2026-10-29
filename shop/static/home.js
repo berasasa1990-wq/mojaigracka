@@ -285,6 +285,7 @@ document.addEventListener('click', async event => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Dodavanje u korpu nije uspjelo.');
+      if (data.meta_event) window.dispatchEvent(new CustomEvent('meta:commerce', {detail: data.meta_event}));
       document.querySelectorAll('[data-cart-count]').forEach(count => {
         count.textContent = data.count;
         count.setAttribute('aria-label', `${data.count} artikala`);

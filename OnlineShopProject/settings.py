@@ -94,6 +94,7 @@ MIDDLEWARE = [
     'shop.seo.SEORobotsMiddleware',
     'shop.promotions.PromotionExpiryMiddleware',
     'shop.analytics.AnalyticsMiddleware',
+    'shop.meta_pixel.MetaPixelMiddleware',
 ]
 
 ROOT_URLCONF = 'OnlineShopProject.urls'
@@ -270,3 +271,22 @@ LOGGING = {
 # Fast WebP is the default. AVIF is optional and attempted once at <=300px only.
 PRODUCT_IMAGE_TRY_AVIF = os.environ.get('PRODUCT_IMAGE_TRY_AVIF', 'false').lower() in ('true', '1', 'yes')
 PRODUCT_IMAGE_AVIF_MAX_SECONDS = 0.08
+
+# Meta Pixel: production must explicitly configure the pixel ID.
+META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '1761995418366231' if DEVELOPMENT else '').strip()
+META_CAPI_ENABLED = os.environ.get('META_CAPI_ENABLED', 'true').lower() == 'true'
+META_CAPI_ACCESS_TOKEN = os.environ.get('META_CAPI_ACCESS_TOKEN', '')
+META_CAPI_API_VERSION = os.environ.get('META_CAPI_API_VERSION', 'v26.0').strip()
+META_CAPI_TEST_EVENT_CODE = os.environ.get('META_CAPI_TEST_EVENT_CODE', '').strip()
+META_CONSENT_CHECK = os.environ.get('META_CONSENT_CHECK', '').strip()
+META_CONSENT_COOKIE = os.environ.get('META_CONSENT_COOKIE', '').strip()
+META_CONSENT_GRANTED_VALUE = os.environ.get('META_CONSENT_GRANTED_VALUE', 'granted')
+
+META_CAPI_TIMEOUT = float(os.environ.get('META_CAPI_TIMEOUT', '5'))
+META_CAPI_MAX_ATTEMPTS = int(os.environ.get('META_CAPI_MAX_ATTEMPTS', '8'))
+META_CAPI_RETRY_SECONDS = int(os.environ.get('META_CAPI_RETRY_SECONDS', '30'))
+META_CAPI_POLL_SECONDS = float(os.environ.get('META_CAPI_POLL_SECONDS', '5'))
+META_SEND_HASHED_PII = os.environ.get('META_SEND_HASHED_PII', 'false').lower() == 'true'
+META_DEFAULT_COUNTRY_CALLING_CODE = os.environ.get('META_DEFAULT_COUNTRY_CALLING_CODE', '387')
+# Trust only a verified number of reverse proxy hops, never arbitrary forwarded headers.
+META_TRUSTED_PROXY_HOPS = int(os.environ.get('META_TRUSTED_PROXY_HOPS', '0'))

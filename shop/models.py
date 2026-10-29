@@ -6,6 +6,7 @@ from .storage import public_image_storage
 from .product_images import ProductImageVariantsMixin
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
@@ -515,3 +516,21 @@ class AnalyticsEvent(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=['kind', 'created_at'])]
+
+
+class MetaTrackingEvent(models.Model):
+    event_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    name = models.CharField(max_length=32)
+    order = models.OneToOneField(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='meta_purchase_event')
+    data = models.JSONField(default=dict)
+    user_data = models.JSONField(default=dict)
+    source_url = models.URLField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    browser_claimed_at = models.DateTimeField(null=True, blank=True)
+    capi_sent_at = models.DateTimeField(null=True, blank=True)
+    capi_status = models.CharField(max_length=12, default='pending', db_index=True)
+    capi_attempts = models.PositiveIntegerField(default=0)
+    capi_next_attempt_at = models.DateTimeField(default=timezone.now, db_index=True)
+    capi_locked_until = models.DateTimeField(null=True, blank=True)
+    capi_lock_token = models.UUIDField(null=True, blank=True, editable=False)
+    capi_last_error = models.CharField(max_length=80, blank=True)
