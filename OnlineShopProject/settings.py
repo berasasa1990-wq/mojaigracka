@@ -20,6 +20,11 @@ import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Local configuration is opt-in via an ignored .env file; server variables win.
+if os.environ.get('RENDER', '').lower() != 'true':
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env', override=False, interpolate=False)
+
 
 # Production is the default. Local development must explicitly opt in.
 DEVELOPMENT = os.environ.get('DJANGO_ENV', 'production') == 'development'
@@ -88,6 +93,7 @@ MIDDLEWARE = [
     'shop.request_cache.RequestReadCacheMiddleware',
     'shop.seo.SEORobotsMiddleware',
     'shop.promotions.PromotionExpiryMiddleware',
+    'shop.analytics.AnalyticsMiddleware',
 ]
 
 ROOT_URLCONF = 'OnlineShopProject.urls'

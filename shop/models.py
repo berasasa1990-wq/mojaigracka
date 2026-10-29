@@ -491,3 +491,27 @@ class GiftPopupSettings(models.Model):
         self.pk = 1
         self.revision = uuid.uuid4()
         super().save(*args, **kwargs)
+
+
+class CustomSetOffer(models.Model):
+    name = models.CharField('Naziv akcije', max_length=150, default='Kreiraj svoj set')
+    quantity = models.PositiveSmallIntegerField('Broj artikala u setu', validators=[MinValueValidator(2), MaxValueValidator(100)])
+    percent = models.DecimalField('Popust (%)', max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(100)])
+    is_active = models.BooleanField('Aktivna akcija', default=True)
+
+    class Meta:
+        ordering = ['quantity', 'pk']
+
+
+class AnalyticsEvent(models.Model):
+    kind = models.CharField(max_length=12, choices=[('visit', 'Posjeta'), ('view', 'Pregled artikla'), ('cart', 'Dodavanje u korpu')])
+    visitor = models.CharField(max_length=32)
+    source = models.CharField(max_length=80, default='Direktno')
+    paid = models.BooleanField(default=False)
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
+    product_name = models.CharField(max_length=255, blank=True)
+    quantity = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['kind', 'created_at'])]

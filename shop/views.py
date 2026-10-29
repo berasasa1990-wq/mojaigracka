@@ -17,6 +17,7 @@ from .forms import PanelLoginForm
 
 
 PANEL_SECTIONS = [
+    {'slug': 'analitika', 'title': 'Analitika', 'description': 'Izvori posjeta, reklame, najgledaniji artikli i dodavanja u korpu.'},
     {'slug': 'poklon-pop-up', 'title': 'Poklon pop up', 'description': 'Pitanje A/B, nasumični pokloni i poseban popust na početnoj.'},
     {'slug': 'premium-seo', 'title': 'Premium SEO', 'description': 'Meta opis sajta, SEO i društvene mreže.', 'module_code': 'premium_seo'},
     {'slug': 'bonus-nagrada', 'title': 'Bonus nagrada', 'description': 'Bonus nagrade i dodatne pogodnosti za kupce.', 'module_code': 'bonus_reward'},
@@ -64,6 +65,39 @@ def panel(request, section=None, orders_in_wms=False):
     if section and not selected:
         raise Http404('Nepostojeća sekcija')
     store_settings = StoreSettings.objects.filter(pk=1).first()
+    if section == 'analitika':
+        from .analytics import dashboard
+        selected_period = request.GET.get('period', '30')
+        if selected_period not in ('7', '30', '90', 'all'):
+            selected_period = '30'
+        days = None if selected_period == 'all' else int(selected_period)
+        return render(request, 'shop/panel.html', {
+            'sections': PANEL_SECTIONS, 'selected': selected, 'site_settings': store_settings,
+            'analytics': dashboard(days), 'analytics_period': selected_period,
+        })
+
+    custom_set_form = None
+    custom_set_forms = []
+    if section == 'akcije':
+        from .models import CustomSetOffer
+        from .forms import CustomSetOfferForm
+        custom_set_form = CustomSetOfferForm(prefix='set')
+        if request.method == 'POST' and request.POST.get('action') == 'delete_custom_set':
+            offer_id = request.POST.get('offer_id', '')
+            offer = get_object_or_404(CustomSetOffer, pk=offer_id if offer_id.isdigit() else None)
+            offer.delete()
+            from django.contrib import messages
+            messages.success(request, 'Akcija je obrisana.')
+            return redirect('panel_section', section='akcije')
+        if request.method == 'POST' and request.POST.get('action') == 'custom_set':
+            instance = get_object_or_404(CustomSetOffer, pk=request.POST['offer_id']) if request.POST.get('offer_id', '').isdigit() else None
+            custom_set_form = CustomSetOfferForm(request.POST, instance=instance, prefix='set')
+            if custom_set_form.is_valid():
+                custom_set_form.save()
+                from django.contrib import messages
+                messages.success(request, 'Akcija „Kreiraj svoj set“ je spremljena.')
+                return redirect('panel_section', section='akcije')
+        custom_set_forms = [(offer, CustomSetOfferForm(instance=offer, prefix='set', auto_id=f'id_offer_{offer.pk}_%s')) for offer in CustomSetOffer.objects.all()]
     if section == 'narudzbe':
         if request.method == 'POST':
             order = get_object_or_404(Order, pk=request.POST.get('order_id') if request.POST.get('order_id', '').isdigit() else None)
@@ -287,7 +321,7 @@ def panel(request, section=None, orders_in_wms=False):
         rows = list(get_user_model().objects.order_by('-date_joined', '-pk'))
     elif section == 'logo':
         rows = [{'name': 'Logo trgovine', 'image_url': store_settings.logo.url}] if store_settings and store_settings.logo else []
-    return render(request, 'shop/panel.html', {'logo_form': logo_form, 'site_settings': store_settings, 'sections': PANEL_SECTIONS, 'selected': selected, 'rows': rows, 'can_add': section in PANEL_FORMS})
+    return render(request, 'shop/panel.html', {'custom_set_form': custom_set_form, 'custom_set_forms': custom_set_forms, 'logo_form': logo_form, 'site_settings': store_settings, 'sections': PANEL_SECTIONS, 'selected': selected, 'rows': rows, 'can_add': section in PANEL_FORMS})
 
 
 PANEL_FORMS = {
@@ -412,6 +446,7 @@ def home(request, category_pk=None, sale_only=False, new_only=False, bestselling
     all_banners = list(Banner.objects.all().order_by('pk'))
     banners = {b.position: b for b in all_banners if b.is_active}
     return render(request, 'shop/home.html', {
+        'gift_wrap_notice': request.session.pop('gift_wrap_notice', ''),
         'storefront_version': max((settings.BASE_DIR / 'shop/static' / name).stat().st_mtime_ns for name in ['css/home.css', 'css/bera-home.css', 'home.js']),
         'site_settings': StoreSettings.objects.filter(pk=1).first(),
         'banner': data.get('banner') if not any(b.position == 'hero' for b in all_banners) else None,
@@ -426,7 +461,7 @@ def home(request, category_pk=None, sale_only=False, new_only=False, bestselling
         'showcase_brands': Brand.objects.filter(product__is_active=True).distinct(),
         'featured_products': products.filter(is_featured=True),
         'bestselling_products': products.bestsellers()[:6],
-        'new_products': products[:24],
+        'new_products': products.order_by('-created_at', '-pk')[:6],
         'sale_products': products.on_sale(),
         'products': products,
         'bestselling_only': bestselling_only,
@@ -515,12 +550,15 @@ def cart(request):
     from .cart import checkout_points_context, selected_cart_points
     context = cart_context(request)
     if request.method == 'POST':
+        if context['loyalty_has_sale_items']:
+            request.session['loyalty_notice'] = 'Na snižene artikle ne može se iskoristiti loyalty. Popust i bodovi vrijede samo za artikle po redovnoj cijeni.'
         requested = context['points_balance'] if request.POST.get('use_max_points') else request.POST.get('loyalty_points', 0)
         quote = checkout_points_context(request, context, requested)
         if request.user.is_authenticated:
             request.session['cart_loyalty_points'] = {'customer': request.user.pk, 'points': quote['points_used']}
         return redirect('cart')
     context.update(checkout_points_context(request, context, selected_cart_points(request)))
+    context['loyalty_notice'] = request.session.pop('loyalty_notice', '')
     return render(request, 'shop/cart.html', {
         **context,
         'categories': Category.objects.all(),
@@ -571,6 +609,8 @@ def cart_update(request, pk):
     else:
         saved.pop(str(pk), None)
     request.session['cart'] = saved
+    if quantity and request.POST.get('gift_packaging') in ('kesa', 'celofan'):
+        request.session['gift_packaging'] = request.POST['gift_packaging']
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         from .cart import article_plus_offer
         offer = article_plus_offer(product, saved) if request.POST.get('action') == 'add' and quantity else None
@@ -617,6 +657,10 @@ def checkout(request):
                 form.add_error(None, 'Dostupnost artikala je promijenjena. Vratite se u korpu i provjerite količine.')
             else:
                 order = form.save(commit=False)
+                packaging = request.session.get('gift_packaging')
+                if packaging in ('kesa', 'celofan', 'folija'):
+                    label = 'Pakovanje u foliju ukrasnu — BESPLATNO' if packaging == 'folija' else 'Rođendanska kesa' if packaging == 'kesa' else 'Celofansko pakovanje'
+                    order.note = (order.note + '\nPakovanje poklona: ' + label).strip()
                 order.customer = request.user if request.user.is_authenticated else None
                 store = StoreSettings.objects.filter(pk=1).first()
                 from .cart import priced_items
@@ -625,13 +669,15 @@ def checkout(request):
                 subtotal = sum(item['subtotal'] for item in priced)
                 from .loyalty import applied_loyalty_percent, loyalty_amount
                 order.loyalty_percent = applied_loyalty_percent(request)
-                order.loyalty_discount = loyalty_amount(subtotal, order.loyalty_percent)
+                from .cart import loyalty_eligible_total
+                eligible = loyalty_eligible_total(priced)
+                order.loyalty_discount = loyalty_amount(eligible, order.loyalty_percent)
                 net = subtotal - order.loyalty_discount
                 from .modules import loyalty_enabled
                 if request.user.is_authenticated and loyalty_enabled():
                     from .loyalty import redeem_points
                     order.save()
-                    points_discount = redeem_points(order, request.user, net, selected_cart_points(request))
+                    points_discount = redeem_points(order, request.user, max(Decimal(0), eligible - order.loyalty_discount), selected_cart_points(request))
                     order.loyalty_discount += points_discount
                     net -= points_discount
                 order.delivery_price = store.delivery_cost(net) if store else 0
@@ -647,6 +693,7 @@ def checkout(request):
                         product.save(update_fields=['stock'])
                 request.session['cart'] = {}
                 request.session.pop('gift_popup_offer', None)
+                request.session.pop('gift_packaging', None)
                 request.session.pop('loyalty_customer', None)
                 request.session.pop('cart_loyalty_points', None)
                 request.session['last_order'] = order.pk
@@ -788,8 +835,14 @@ def cart_loyalty(request):
     if not loyalty_enabled():
         request.session.pop('loyalty_customer', None)
         return redirect('cart')
-    if request.POST.get('action') == 'apply' and cart_context(request)['cart_count']:
-        request.session['loyalty_customer'] = request.user.pk
+    context = cart_context(request)
+    if request.POST.get('action') == 'apply' and context['cart_count']:
+        if context['loyalty_has_sale_items']:
+            request.session['loyalty_notice'] = 'Na snižene artikle ne može se iskoristiti loyalty. Popust vrijedi samo za artikle po redovnoj cijeni.'
+        if context['loyalty_eligible_total'] > 0:
+            request.session['loyalty_customer'] = request.user.pk
+        else:
+            request.session.pop('loyalty_customer', None)
     else:
         request.session.pop('loyalty_customer', None)
     return redirect('cart')
@@ -894,3 +947,31 @@ def bonus_reward_add(request, pk):
             product._stock_reason = f'Bonus nagrada uz narudžbu #{order.pk}'
             product.save(update_fields=['stock'])
     return redirect(reverse('checkout') + '?success=1')
+
+
+def gift_catalog(request):
+    from django.core.paginator import Paginator
+    products = Product.objects.filter(is_active=True, is_out_of_stock=False).select_related('brand', 'plus_product').order_by('name', 'pk')
+    query = request.GET.get('q', '').strip()[:100]
+    if query:
+        products = products.filter(name__icontains=query)
+    page = Paginator(products, 24).get_page(request.GET.get('page', 1))
+    response = JsonResponse({'products': [
+        {'name': p.name, 'image': p.image_thumbnail_url if p.image else '',
+         'price': f'{p.price:.2f} KM', 'add_url': reverse('cart_update', args=[p.pk]),
+         'limit': p.cart_quantity_limit}
+        for p in page if p.is_available
+    ], 'next': page.next_page_number() if page.has_next() else None})
+    response['Cache-Control'] = 'no-store'
+    return response
+
+
+@require_POST
+def gift_wrap(request):
+    if request.POST.get('action') == 'confirm':
+        request.session['gift_packaging'] = 'folija'
+        request.session['gift_wrap_notice'] = 'Sada samo naručite artikle koje želite, a mi ćemo ih zapakovati u ukrasnu foliju i poslati. Pakovanje je besplatno!'
+        return redirect('home')
+    elif request.POST.get('action') == 'remove':
+        request.session.pop('gift_packaging', None)
+    return redirect('cart')

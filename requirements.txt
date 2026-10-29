@@ -9,3 +9,5 @@ django-storages==1.14.6
 boto3==1.43.119
 
 imageio-ffmpeg==0.6.0
+
+python-dotenv==1.2.1

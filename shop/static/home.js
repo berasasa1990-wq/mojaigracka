@@ -455,11 +455,10 @@ function updateSaleCountdowns() {
       timer.querySelector('[data-countdown-value]').textContent = 'Istekla';
       return;
     }
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor(seconds % 86400 / 3600);
+    const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor(seconds % 3600 / 60);
     const pad = value => String(value).padStart(2, '0');
-    timer.querySelector('[data-countdown-value]').textContent = `${days ? days + 'd ' : ''}${pad(hours)}:${pad(minutes)}:${pad(seconds % 60)}`;
+    timer.querySelector('[data-countdown-value]').textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds % 60)}`;
   });
   if (saleCountdowns.every(timer => {
     const end = Date.parse(timer.dataset.saleCountdown);
@@ -666,3 +665,13 @@ document.querySelectorAll('.mobile-home-benefits').forEach(track => {
     track.scrollTo({left: track.scrollLeft >= end - 2 ? 0 : Math.min(end, track.scrollLeft + track.clientWidth + 10), behavior: 'smooth'});
   }, 3000);
 });
+
+const giftWrapDialog = document.querySelector('#giftWrapDialog');
+document.querySelectorAll('[data-gift-open]').forEach(button => button.addEventListener('click', () => giftWrapDialog?.showModal()));
+giftWrapDialog?.querySelector('[data-gift-wrap-cancel]')?.addEventListener('click', () => giftWrapDialog.close());
+
+const loyaltyNotice = document.querySelector('#loyalty-notice');
+if (loyaltyNotice) showNotice(JSON.parse(loyaltyNotice.textContent));
+
+const giftWrapNotice = document.querySelector('#gift-wrap-notice');
+if (giftWrapNotice) showNotice(JSON.parse(giftWrapNotice.textContent));

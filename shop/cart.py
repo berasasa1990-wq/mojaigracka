@@ -23,12 +23,13 @@ def cart_context(request):
     _, available_percent = loyalty_status(request.user)
     percent = applied_loyalty_percent(request)
     applied = request.user.is_authenticated and request.session.get('loyalty_customer') == request.user.pk
-    discount = loyalty_amount(subtotal, percent)
+    eligible = loyalty_eligible_total(items)
+    discount = loyalty_amount(eligible, percent)
     delivery = store.delivery_cost(subtotal - discount) if store and items else Decimal('0.00')
     from .modules import loyalty_enabled
     from .models import LoyaltyCard
     card = LoyaltyCard.objects.filter(customer=request.user).first() if request.user.is_authenticated and loyalty_enabled() else None
-    return {'loyalty_rules': rules(), 'points_balance': max(0, card.points) if card else 0, 'loyalty_enabled': loyalty_enabled(), 'loyalty_available_percent': available_percent, 'loyalty_applied': applied, 'delivery_price': delivery, 'loyalty_percent': percent, 'loyalty_discount': discount, 'grand_total': subtotal - discount + delivery, 'cart_items': items, 'cart_count': sum(i['quantity'] for i in items),
+    return {'gift_wrap_selected': request.session.get('gift_packaging') == 'folija', 'loyalty_eligible_total': eligible, 'loyalty_has_sale_items': eligible < subtotal, 'loyalty_rules': rules(), 'points_balance': max(0, card.points) if card else 0, 'loyalty_enabled': loyalty_enabled(), 'loyalty_available_percent': available_percent, 'loyalty_applied': applied, 'delivery_price': delivery, 'loyalty_percent': percent, 'loyalty_discount': discount, 'grand_total': subtotal - discount + delivery, 'cart_items': items, 'cart_count': sum(i['quantity'] for i in items),
             'cart_total': subtotal}
 
 
@@ -71,6 +72,7 @@ def priced_items(products, quantities, *, gift_claim=None):
     apply_bundle_discounts(items, products, quantities)
     from .gift_popup import apply_gift_discount
     apply_gift_discount(items, gift_claim)
+    apply_custom_set_discount(items)
     return items
 
 
@@ -148,8 +150,9 @@ def apply_bundle_discounts(items, products, quantities):
 def checkout_points_context(request, context, requested=0):
     from .loyalty import point_quote
     net = context['cart_total'] - context['loyalty_discount']
-    used, discount = point_quote(request.user, net, requested)
-    allowed, _ = point_quote(request.user, net, context['points_balance'])
+    eligible_net = max(Decimal('0'), context['loyalty_eligible_total'] - context['loyalty_discount'])
+    used, discount = point_quote(request.user, eligible_net, requested)
+    allowed, _ = point_quote(request.user, eligible_net, context['points_balance'])
     store = StoreSettings.objects.filter(pk=1).first()
     delivery = store.delivery_cost(net - discount) if store and context['cart_items'] else Decimal('0.00')
     return {
@@ -163,3 +166,57 @@ def selected_cart_points(request):
     if request.user.is_authenticated and selection.get('customer') == request.user.pk:
         return selection.get('points', 0)
     return 0
+
+
+def apply_custom_set_discount(items):
+    from .models import CustomSetOffer
+    units = []
+    for item in items:
+        for price, count, label in item['promotion_groups']:
+            units.extend((item, price, label) for _ in range(count))
+    # Highest-priced units form full sets first; leftover units keep their price.
+    ordered = sorted(range(len(units)), key=lambda i: (-units[i][0]['product'].price, units[i][0]['product'].pk))
+    best = None
+    best_saving = Decimal('0')
+    for offer in CustomSetOffer.objects.filter(is_active=True):
+        if offer.quantity < 2 or not 0 < offer.percent <= 100:
+            continue
+        eligible = ordered[:len(units) // offer.quantity * offer.quantity]
+        prices = {}
+        saving = Decimal('0')
+        for index in eligible:
+            item, current, _ = units[index]
+            price = (item['product'].price * (1 - offer.percent / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if price < current:
+                prices[index] = price
+                saving += current - price
+        if saving > best_saving:
+            best_saving, best = saving, (offer, prices)
+    if best is None:
+        return
+    offer, prices = best
+    label = f'{offer.name}: set {offer.quantity} artikla (−{offer.percent.normalize():f}%)'
+    for item in items:
+        groups = {}
+        for index, (owner, price, promotion) in enumerate(units):
+            if owner is not item:
+                continue
+            if index in prices:
+                price, promotion = prices[index], label
+                item['custom_set_label'] = label
+            groups[(price, promotion)] = groups.get((price, promotion), 0) + 1
+        item['promotion_groups'] = [(price, count, promotion) for (price, promotion), count in groups.items()]
+        item['price_groups'] = [(price, count) for price, count, _ in item['promotion_groups']]
+        item['subtotal'] = sum((price * count for price, count in item['price_groups']), Decimal('0'))
+
+
+def loyalty_eligible_total(items):
+    """Loyalty applies only to units without a sale or promotion discount."""
+    total = Decimal('0')
+    for item in items:
+        product = item['product']
+        if product.original_price and product.original_price > product.price:
+            continue
+        total += sum((price * count for price, count, label in item['promotion_groups']
+                      if price >= product.price), Decimal('0'))
+    return total

@@ -93,3 +93,28 @@ class CheckoutPointsPreviewTests(TestCase):
         self.client.get(reverse('cart'))
         self.assertNotIn('loyalty_customer', self.client.session)
         self.assertNotIn('cart_loyalty_points', self.client.session)
+
+    def test_sale_items_excluded_from_points_and_popup(self):
+        self.product.original_price = 120
+        self.product.save()
+        self.client.post(reverse('cart'), {'use_max_points': '1'})
+        response = self.client.get(reverse('cart'))
+        self.assertEqual(response.context['points_used'], 0)
+        self.assertContains(response, 'loyalty-notice')
+        self.assertEqual(response.context['loyalty_eligible_total'], Decimal('0'))
+        self.client.post(self.url, dict(customer_name='Kupac', email='buyer@example.com', phone='061123456', address='Ulica 1', city='Sarajevo', postal_code='71000'))
+        self.assertEqual(Order.objects.get().loyalty_discount, Decimal('0'))
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.points, 1000)
+
+    def test_mixed_cart_points_only_apply_to_regular_items(self):
+        self.product.original_price = 120
+        self.product.save()
+        regular = Product.objects.create(name='Redovna cijena', price=20)
+        session = self.client.session
+        session['cart'][str(regular.pk)] = 1
+        session.save()
+        self.client.post(reverse('cart'), {'use_max_points': '1'})
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['points_discount'], Decimal('10'))
+        self.assertEqual(response.context['loyalty_eligible_total'], Decimal('20'))

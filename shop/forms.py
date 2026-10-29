@@ -294,13 +294,37 @@ class SaleForm(forms.ModelForm):
 from django.contrib.auth.forms import AuthenticationForm
 
 
+def authenticate_by_email(request, email, password):
+    from django.contrib.auth import authenticate
+    from django.db.models.functions import Trim
+    users = list(get_user_model().objects.annotate(login_email=Trim('email')).filter(login_email__iexact=email.strip())[:21])
+    if len(users) > 20:
+        return None
+    matches = []
+    for user in users:
+        authenticated = authenticate(request, username=user.get_username(), password=password)
+        if authenticated is not None:
+            matches.append(authenticated)
+    return matches[0] if len(matches) == 1 else None
+
+
 class PanelLoginForm(AuthenticationForm):
-    username = forms.CharField(label='Korisničko ime')
+    username = forms.CharField(label='Korisničko ime ili e-mail')
     password = forms.CharField(label='Lozinka', strip=False, widget=forms.PasswordInput)
     error_messages = {
         'invalid_login': 'Korisničko ime ili lozinka nisu ispravni.',
         'inactive': 'Ovaj nalog nije aktivan.',
     }
+
+    def clean(self):
+        username = self.cleaned_data.get('username', '')
+        password = self.cleaned_data.get('password')
+        if '@' in username and password:
+            self.user_cache = authenticate_by_email(self.request, username, password)
+            if self.user_cache is not None:
+                self.confirm_login_allowed(self.user_cache)
+                return self.cleaned_data
+        return super().clean()
 
     def confirm_login_allowed(self, user):
         super().confirm_login_allowed(user)
@@ -450,10 +474,7 @@ class CustomerLoginForm(AuthenticationForm):
         email = self.cleaned_data.get('username')
         password = self.cleaned_data.get('password')
         if email and password:
-            users = list(get_user_model().objects.filter(email__iexact=email.strip())[:2])
-            if len(users) != 1:
-                raise self.get_invalid_login_error()
-            self.user_cache = authenticate(self.request, username=users[0].username, password=password)
+            self.user_cache = authenticate_by_email(self.request, email, password)
             if self.user_cache is None:
                 raise self.get_invalid_login_error()
             self.confirm_login_allowed(self.user_cache)
@@ -650,3 +671,10 @@ class GiftPopupSettingsForm(forms.ModelForm):
                 if not data.get(name) and name not in self.errors:
                     self.add_error(name, 'Izaberite kategoriju.')
         return data
+
+
+class CustomSetOfferForm(forms.ModelForm):
+    class Meta:
+        from .models import CustomSetOffer
+        model = CustomSetOffer
+        fields = ['name', 'quantity', 'percent', 'is_active']

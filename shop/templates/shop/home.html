@@ -22,4 +22,4 @@
 {% include 'shop/partials/mobile_menu.html' %}
 {% if not search_query and not selected_brand and not selected_category and not sale_only and not new_only and not bestselling_only %}{% include 'shop/partials/chatbot_widget.html' %}{% include 'shop/partials/gift_popup.html' %}{% endif %}
 <dialog id="notice"><p></p><button type="button">Zatvori</button></dialog>
-</body></html>
+{% if gift_wrap_notice %}{{ gift_wrap_notice|json_script:"gift-wrap-notice" }}{% endif %}</body></html>

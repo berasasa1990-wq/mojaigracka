@@ -1,3 +1,4 @@
+from shop.views import gift_catalog, gift_wrap
 from shop.storefront_images import storefront_image
 from shop.brand_images import brand_logo_image
 from shop.category_images import category_icon
@@ -48,6 +49,8 @@ urlpatterns = [
     path('kategorija/<int:pk>/ikona.webp', category_icon, name='category_icon'),
     path('brend/<int:pk>/logo.webp', brand_logo_image, name='brand_logo_image'),
     path('prikaz/<slug:kind>/<int:pk>/<int:width>.webp', storefront_image, name='storefront_image'),
+    path('poklon/pakovanje/', gift_wrap, name='gift_wrap'),
+    path('poklon/artikli/', gift_catalog, name='gift_catalog'),
     path('robots.txt', robots, name='seo_robots'),
     path('sitemap.xml', sitemap, name='seo_sitemap'),
     path('sitemap-<slug:section>-<int:page>.xml', sitemap, name='seo_sitemap_section'),
